@@ -78,8 +78,7 @@ void Assembly::append(Assembly const& _a, int _deposit)
 	while (_deposit++ < _a.m_deposit)
 		append(Instruction::POP);
 }
-
-AssemblyItem const& Assembly::append(AssemblyItem const& _i)
+AssemblyItem const& Assembly::_append(AssemblyItem const& _i)
 {
 	assertThrow(m_deposit >= 0, AssemblyException, "Stack underflow.");
 	m_deposit += _i.deposit();
@@ -87,6 +86,30 @@ AssemblyItem const& Assembly::append(AssemblyItem const& _i)
 	if (m_items.back().location().isEmpty() && !m_currentSourceLocation.isEmpty())
 		m_items.back().setLocation(m_currentSourceLocation);
 	return back();
+}
+
+AssemblyItem const& Assembly::append(AssemblyItem const& _i)
+{
+	//cerr << "Assembly::append HACK" << endl;
+
+	// hook this for the bad opcodes and generate the replacement code
+	if (_i.type() == Operation) {
+		//printf("  THIS IS OPERATION\n")
+		switch (_i.instruction()) {
+			case Instruction::SLOAD:
+				cerr << "rewrite sload:  " << _i << endl;
+				break;
+			case Instruction::SSTORE:
+				cerr << "rewrite sstore: " << _i << endl;
+				break;
+			case Instruction::CHAINID:
+				cerr << "rewrite chainid: " << _i << endl;
+				break;
+			default:
+				break;
+		}
+	}
+	return _append(_i);
 }
 
 void Assembly::injectStart(AssemblyItem const& _i)
@@ -231,8 +254,8 @@ void Assembly::assemblyStream(ostream& _out, string const& _prefix, StringMap co
 		}
 	}
 
-	if (m_auxiliaryData.size() > 0)
-		_out << endl << _prefix << "auxdata: 0x" << toHex(m_auxiliaryData) << endl;
+	/*if (m_auxiliaryData.size() > 0)
+		_out << endl << _prefix << "auxdata: 0x" << toHex(m_auxiliaryData) << endl;*/
 }
 
 string Assembly::assemblyString(StringMap const& _sourceCodes) const

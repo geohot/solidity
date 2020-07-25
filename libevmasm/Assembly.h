@@ -58,6 +58,7 @@ public:
 	AssemblyItem newPushLibraryAddress(std::string const& _identifier);
 
 	AssemblyItem const& append(AssemblyItem const& _i);
+	AssemblyItem const& _append(AssemblyItem const& _i);
 	AssemblyItem const& append(std::string const& _data) { return append(newPushString(_data)); }
 	AssemblyItem const& append(bytes const& _data) { return append(newData(_data)); }
 
