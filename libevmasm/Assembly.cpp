@@ -93,7 +93,7 @@ AssemblyItem const& Assembly::append(AssemblyItem const& _i)
 	//cerr << "Assembly::append HACK" << endl;
 
 	// hook this for the bad opcodes and generate the replacement code
-	if (_i.type() == Operation) {
+	/*if (_i.type() == Operation) {
 		//printf("  THIS IS OPERATION\n")
 		switch (_i.instruction()) {
 			case Instruction::SLOAD:
@@ -108,7 +108,7 @@ AssemblyItem const& Assembly::append(AssemblyItem const& _i)
 			default:
 				break;
 		}
-	}
+	}*/
 	return _append(_i);
 }
 

@@ -527,6 +527,32 @@ eth::AssemblyItem CompilerContext::FunctionCompilationQueue::entryLabel(
 
 }
 
+CompilerContext& CompilerContext::operator<<(eth::AssemblyItem const& _item) {
+	//cerr << "AssemblyItem operator<< " << _item << endl;
+	m_asm->append(_item);
+	return *this;
+}
+
+CompilerContext& CompilerContext::operator<<(dev::eth::Instruction _instruction) {
+	//cerr << "Instruction operator<< " << _instruction << endl;
+	if (_instruction == Instruction::SSTORE) {
+		cerr << "rewriting SSTORE" << endl;
+		appendInlineAssembly(R"({
+				sstore(x1, x2)
+			})", {"x2", "x1"});
+		m_asm->append(Instruction::POP);
+		m_asm->append(Instruction::POP);
+	} else if (_instruction == Instruction::SLOAD) {
+		cerr << "rewriting SLOAD" << endl;
+		appendInlineAssembly(R"({
+				x1 := sload(x1)
+			})", {"x1"});
+  } else {
+		m_asm->append(_instruction);
+	}
+	return *this;
+}
+
 eth::AssemblyItem CompilerContext::FunctionCompilationQueue::entryLabelIfExists(Declaration const& _declaration) const
 {
 	auto res = m_entryLabels.find(&_declaration);
