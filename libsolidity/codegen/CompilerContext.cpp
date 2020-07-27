@@ -78,7 +78,6 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 					})", {"x2", "x1"});*/
 				c->appendInlineAssembly(R"({
 						let methodId := 0x28dcb2a0
-						let addr := 0xA193E42526F1FEA8C99AF609dcEabf30C1c29fAA
 
 						let callBytes := mload(0x40)
 
@@ -93,7 +92,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 						mstore(add(callBytes, 0x24), x2)
 
             // overwrite call params
-            let success := call(gas(), addr, 0, callBytes, 0x44, callBytes, 0)
+            let success := call(gas(), caller(), 0, callBytes, 0x44, callBytes, 0)
 
             if eq(success, 0) {
                 revert(0, 0)
@@ -115,7 +114,6 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 				c->appendInlineAssembly(R"({
 						//let methodId := shr(keccak256('ovmSLOAD()'), 224)
 						let methodId := 0x20966208
-						let addr := 0xA193E42526F1FEA8C99AF609dcEabf30C1c29fAA
 
 						let callBytes := mload(0x40)
 
@@ -129,7 +127,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 						mstore(add(callBytes, 4), x1)
 
             // overwrite call params
-            let success := call(gas(), addr, 0, callBytes, 0x24, callBytes, 0x20)
+            let success := call(gas(), caller(), 0, callBytes, 0x24, callBytes, 0x20)
 
             if eq(success, 0) {
                 revert(0, 0)
@@ -144,7 +142,6 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 				c->assemblyPtr()->append(Instruction::DUP1);
 				c->appendInlineAssembly(R"({
 						let methodId := 0x73509064
-						let addr := 0xA193E42526F1FEA8C99AF609dcEabf30C1c29fAA
 
 						let callBytes := mload(0x40)
 
@@ -155,7 +152,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
             mstore8(add(callBytes, 3), methodId)
 
             // overwrite call params
-            let success := call(gas(), addr, 0, callBytes, 4, callBytes, 0x20)
+            let success := call(gas(), caller(), 0, callBytes, 4, callBytes, 0x20)
 
             if eq(success, 0) {
                 revert(0, 0)
