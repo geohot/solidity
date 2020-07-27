@@ -37,6 +37,8 @@
 #include <libyul/Object.h>
 #include <libyul/YulString.h>
 
+#include <libdevcore/Whiskers.h>
+
 #include <liblangutil/ErrorReporter.h>
 #include <liblangutil/Scanner.h>
 #include <liblangutil/SourceReferenceFormatter.h>
@@ -59,6 +61,97 @@ using namespace dev::eth;
 using namespace dev;
 using namespace dev::solidity;
 
+/*
+Opcodes that require replacement:
+0,1 = simple:
+CALLER
+ADDRESS
+TIMESTAMP
+CHAINID
+GASLIMIT
+ORIGIN
+
+1,1 = simple:
+SLOAD
+EXTCODESIZE
+EXTCODEHASH
+
+2,0 = simple:
+SSTORE
+
+annoying functions:
+CREATE(3,1)
+CREATE2(4,1)
+CALL(7,1)
+STATICCALL(6,1)
+DELEGATECALL(6,1)
+EXTCODECOPY(4,0) (address, index, length)
+*/
+
+void simpleRewrite(CompilerContext *c, string function, int _in, int _out) {
+	auto methodId = FixedHash<4>(dev::keccak256(function)).hex();
+	cerr << "rewriting " << function << endl;
+
+	for (int i = 0; i < _out-_in; i++) {
+		c->assemblyPtr()->append(Instruction::DUP1);
+	}
+
+	// TODO: there's extra mloads and mstores
+	auto asm_code = Whiskers(R"({
+		let methodId := 0x<methodId>
+
+		let callBytes := mload(0x40)
+
+		// replace the first 4 bytes with the right methodID
+		mstore8(callBytes, shr(24, methodId))
+		mstore8(add(callBytes, 1), shr(16, methodId))
+		mstore8(add(callBytes, 2), shr(8, methodId))
+		mstore8(add(callBytes, 3), methodId)
+
+		// address to load
+		<input>
+
+		// overwrite call params
+		let success := call(gas(), caller(), 0, callBytes, <in_size>, callBytes, <out_size>)
+
+		if eq(success, 0) {
+				revert(0, 0)
+		}
+
+		<output>
+	})")("methodId", methodId);
+	asm_code("in_size", to_string(_in*0x20+4));
+	asm_code("out_size", to_string(_out*0x20));
+
+	asm_code("output", (_out > 0) ? "x1 := mload(callBytes)" : "");
+
+	switch(_in) {
+		default:
+		case 0:
+			asm_code("input", "");
+			break;
+		case 1:
+			asm_code("input", "mstore(add(callBytes, 4), x1)");
+			break;
+		case 2:
+			asm_code("input", "mstore(add(callBytes, 4), x1)\nmstore(add(callBytes, 0x24), x2)");
+			break;
+	}
+
+	//cerr << asm_code.render() << endl;
+
+	if (_in == 2) {
+		c->appendInlineAssembly(asm_code.render(), {"x2", "x1"});
+	} else {
+		c->appendInlineAssembly(asm_code.render(), {"x1"});
+	}
+	
+	for (int i = 0; i < _in-_out; i++) {
+		c->assemblyPtr()->append(Instruction::POP);
+	}
+}
+
+
 bool disable_rewrite = false;
 bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 	CompilerContext *c = (CompilerContext *)a;
@@ -70,96 +163,18 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 	//cerr << "Instruction operator<< " << _instruction << endl;
 	bool ret = false;
 	if (_i.type() == Operation) {
+		
 		switch (_i.instruction()) {
 			case Instruction::SSTORE:
-				cerr << "rewriting SSTORE" << endl;
-				/*c->appendInlineAssembly(R"({
-						sstore(x1, x2)
-					})", {"x2", "x1"});*/
-				c->appendInlineAssembly(R"({
-						let methodId := 0x28dcb2a0
-
-						let callBytes := mload(0x40)
-
-            // replace the first 4 bytes with the right methodID
-            mstore8(callBytes, shr(24, methodId))
-            mstore8(add(callBytes, 1), shr(16, methodId))
-            mstore8(add(callBytes, 2), shr(8, methodId))
-            mstore8(add(callBytes, 3), methodId)
-
-						// params
-						mstore(add(callBytes, 4), x1)
-						mstore(add(callBytes, 0x24), x2)
-
-            // overwrite call params
-            let success := call(gas(), caller(), 0, callBytes, 0x44, callBytes, 0)
-
-            if eq(success, 0) {
-                revert(0, 0)
-            }
-					})", {"x2", "x1"});
-
-				c->assemblyPtr()->append(Instruction::POP);
-				c->assemblyPtr()->append(Instruction::POP);
+				simpleRewrite(c, "ovmSSTORE()", 2, 0);
 				ret = true;
 				break;
 			case Instruction::SLOAD:
-				cerr << "rewriting SLOAD" << endl;
-				/*c->appendInlineAssembly(R"({
-						x1 := sload(x1)
-					})", {"x1"});*/
-
-				// from sha3 import keccak_256
-				// "0x"+keccak_256(b"ovmSLOAD()").hexdigest()[:8] = 0x20966208
-				c->appendInlineAssembly(R"({
-						//let methodId := shr(keccak256('ovmSLOAD()'), 224)
-						let methodId := 0x20966208
-
-						let callBytes := mload(0x40)
-
-            // replace the first 4 bytes with the right methodID
-            mstore8(callBytes, shr(24, methodId))
-            mstore8(add(callBytes, 1), shr(16, methodId))
-            mstore8(add(callBytes, 2), shr(8, methodId))
-            mstore8(add(callBytes, 3), methodId)
-
-						// address to load
-						mstore(add(callBytes, 4), x1)
-
-            // overwrite call params
-            let success := call(gas(), caller(), 0, callBytes, 0x24, callBytes, 0x20)
-
-            if eq(success, 0) {
-                revert(0, 0)
-            }
-
-						x1 := mload(callBytes)
-					})", {"x1"});
+				simpleRewrite(c, "ovmSLOAD()", 1, 1);
 				ret = true;
 				break;
 			case Instruction::CALLER:
-				cerr << "rewriting CALLER" << endl;
-				c->assemblyPtr()->append(Instruction::DUP1);
-				c->appendInlineAssembly(R"({
-						let methodId := 0x73509064
-
-						let callBytes := mload(0x40)
-
-            // replace the first 4 bytes with the right methodID
-            mstore8(callBytes, shr(24, methodId))
-            mstore8(add(callBytes, 1), shr(16, methodId))
-            mstore8(add(callBytes, 2), shr(8, methodId))
-            mstore8(add(callBytes, 3), methodId)
-
-            // overwrite call params
-            let success := call(gas(), caller(), 0, callBytes, 4, callBytes, 0x20)
-
-            if eq(success, 0) {
-                revert(0, 0)
-            }
-
-						x1 := mload(callBytes)
-					})", {"x1"});
+				simpleRewrite(c, "ovmCALLER()", 0, 1);
 				ret = true;
 				break;
 			case Instruction::ADDRESS:
