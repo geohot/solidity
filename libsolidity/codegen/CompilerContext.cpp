@@ -80,12 +80,16 @@ EXTCODEHASH
 SSTORE
 
 annoying functions:
-CREATE(3,1)
-CREATE2(4,1)
-CALL(7,1)
-STATICCALL(6,1)
-DELEGATECALL(6,1)
-EXTCODECOPY(4,0) (address, index, length)
+see https://ethervm.io
+
+CREATE(3,1)         (value<ignore>, offset, length) -> (addr)
+CREATE2(4,1)        (value<ignore>, offset, length, salt) -> (addr)
+
+CALL(7,1)           (gas<ignore>, addr, value<ignore>, argsOffset, argsLength, retOffset, retLength) -> (success)
+STATICCALL(6,1)     (gas<ignore>, addr, argsOffset, argsLength, retOffset, retLength) -> (success)
+DELEGATECALL(6,1)   (gas<ignore>, addr, argsOffset, argsLength, retOffset, retLength) -> (success)
+
+EXTCODECOPY(4,0)    (addr, destOffset, offset, length)
 */
 
 void simpleRewrite(CompilerContext *c, string function, int _in, int _out) {
@@ -96,11 +100,14 @@ void simpleRewrite(CompilerContext *c, string function, int _in, int _out) {
 		c->assemblyPtr()->append(Instruction::DUP1);
 	}
 
-	// TODO: there's extra mloads and mstores
 	auto asm_code = Whiskers(R"({
 		let methodId := 0x<methodId>
 
 		let callBytes := mload(0x40)
+
+		// hmm, never free memory?
+		// unclear if this is needed
+		mstore(0x40, add(callBytes, <max_size>))
 
 		// replace the first 4 bytes with the right methodID
 		mstore8(callBytes, shr(24, methodId))
@@ -122,6 +129,7 @@ void simpleRewrite(CompilerContext *c, string function, int _in, int _out) {
 	})")("methodId", methodId);
 	asm_code("in_size", to_string(_in*0x20+4));
 	asm_code("out_size", to_string(_out*0x20));
+	asm_code("max_size", to_string(max(_in*0x20+4, _out*0x20)));
 
 	asm_code("output", (_out > 0) ? "x1 := mload(callBytes)" : "");
 
@@ -150,7 +158,6 @@ void simpleRewrite(CompilerContext *c, string function, int _in, int _out) {
 		c->assemblyPtr()->append(Instruction::POP);
 	}
 }
-
 
 bool disable_rewrite = false;
 bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
