@@ -70,28 +70,118 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 	//cerr << "Instruction operator<< " << _instruction << endl;
 	bool ret = false;
 	if (_i.type() == Operation) {
-		if (_i.instruction() == Instruction::SSTORE) {
-			cerr << "rewriting SSTORE" << endl;
-			c->appendInlineAssembly(R"({
-					sstore(x1, x2)
-				})", {"x2", "x1"});
-			c->assemblyPtr()->append(Instruction::POP);
-			c->assemblyPtr()->append(Instruction::POP);
-			ret = true;
-		} else if (_i.instruction() == Instruction::SLOAD) {
-			cerr << "rewriting SLOAD" << endl;
-			c->appendInlineAssembly(R"({
-					x1 := sload(x1)
-				})", {"x1"});
-			ret = true;
-		} else if (_i.instruction() == Instruction::CHAINID) {
-			cerr << "rewriting CHAINID" << endl;
-			// junk on stack to overwrite
-			c->assemblyPtr()->append(Instruction::DUP1);
-			c->appendInlineAssembly(R"({
-					x1 := chainid()
-				})", {"x1"});
-			ret = true;
+		switch (_i.instruction()) {
+			case Instruction::SSTORE:
+				cerr << "rewriting SSTORE" << endl;
+				/*c->appendInlineAssembly(R"({
+						sstore(x1, x2)
+					})", {"x2", "x1"});*/
+				c->appendInlineAssembly(R"({
+						let methodId := 0x28dcb2a0
+						let addr := 0xA193E42526F1FEA8C99AF609dcEabf30C1c29fAA
+
+						let callBytes := mload(0x40)
+
+            // replace the first 4 bytes with the right methodID
+            mstore8(callBytes, shr(24, methodId))
+            mstore8(add(callBytes, 1), shr(16, methodId))
+            mstore8(add(callBytes, 2), shr(8, methodId))
+            mstore8(add(callBytes, 3), methodId)
+
+						// params
+						mstore(add(callBytes, 4), x1)
+						mstore(add(callBytes, 0x24), x2)
+
+            // overwrite call params
+            let success := call(gas(), addr, 0, callBytes, 0x44, callBytes, 0)
+
+            if eq(success, 0) {
+                revert(0, 0)
+            }
+					})", {"x2", "x1"});
+
+				c->assemblyPtr()->append(Instruction::POP);
+				c->assemblyPtr()->append(Instruction::POP);
+				ret = true;
+				break;
+			case Instruction::SLOAD:
+				cerr << "rewriting SLOAD" << endl;
+				/*c->appendInlineAssembly(R"({
+						x1 := sload(x1)
+					})", {"x1"});*/
+
+				// from sha3 import keccak_256
+				// "0x"+keccak_256(b"ovmSLOAD()").hexdigest()[:8] = 0x20966208
+				c->appendInlineAssembly(R"({
+						//let methodId := shr(keccak256('ovmSLOAD()'), 224)
+						let methodId := 0x20966208
+						let addr := 0xA193E42526F1FEA8C99AF609dcEabf30C1c29fAA
+
+						let callBytes := mload(0x40)
+
+            // replace the first 4 bytes with the right methodID
+            mstore8(callBytes, shr(24, methodId))
+            mstore8(add(callBytes, 1), shr(16, methodId))
+            mstore8(add(callBytes, 2), shr(8, methodId))
+            mstore8(add(callBytes, 3), methodId)
+
+						// address to load
+						mstore(add(callBytes, 4), x1)
+
+            // overwrite call params
+            let success := call(gas(), addr, 0, callBytes, 0x24, callBytes, 0x20)
+
+            if eq(success, 0) {
+                revert(0, 0)
+            }
+
+						x1 := mload(callBytes)
+					})", {"x1"});
+				ret = true;
+				break;
+			case Instruction::CALLER:
+				cerr << "rewriting CALLER" << endl;
+				c->assemblyPtr()->append(Instruction::DUP1);
+				c->appendInlineAssembly(R"({
+						let methodId := 0x73509064
+						let addr := 0xA193E42526F1FEA8C99AF609dcEabf30C1c29fAA
+
+						let callBytes := mload(0x40)
+
+            // replace the first 4 bytes with the right methodID
+            mstore8(callBytes, shr(24, methodId))
+            mstore8(add(callBytes, 1), shr(16, methodId))
+            mstore8(add(callBytes, 2), shr(8, methodId))
+            mstore8(add(callBytes, 3), methodId)
+
+            // overwrite call params
+            let success := call(gas(), addr, 0, callBytes, 4, callBytes, 0x20)
+
+            if eq(success, 0) {
+                revert(0, 0)
+            }
+
+						x1 := mload(callBytes)
+					})", {"x1"});
+				ret = true;
+				break;
+			case Instruction::ADDRESS:
+				cerr << "rewriting ADDRESS" << endl;
+				break;
+			case Instruction::TIMESTAMP:
+				cerr << "rewriting TIMESTAMP" << endl;
+				break;
+			case Instruction::CHAINID:
+				cerr << "rewriting CHAINID" << endl;
+				// junk on stack to overwrite
+				/*c->assemblyPtr()->append(Instruction::DUP1);
+				c->appendInlineAssembly(R"({
+						x1 := chainid()
+					})", {"x1"});
+				ret = true;*/
+				break;
+			default:
+				break;
 		}
 	}
 
