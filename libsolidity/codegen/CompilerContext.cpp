@@ -82,17 +82,19 @@ SSTORE
 annoying functions:
 see https://ethervm.io
 
-CREATE(3,1)         (value<ignore>, offset, length) -> (addr)
-CREATE2(4,1)        (value<ignore>, offset, length, salt) -> (addr)
-
 CALL(7,1)           (gas<ignore>, addr, value<ignore>, argsOffset, argsLength, retOffset, retLength) -> (success)
 STATICCALL(6,1)     (gas<ignore>, addr, argsOffset, argsLength, retOffset, retLength) -> (success)
 DELEGATECALL(6,1)   (gas<ignore>, addr, argsOffset, argsLength, retOffset, retLength) -> (success)
 
+CREATE(3,1)         (value<ignore>, offset, length) -> (addr)
+CREATE2(4,1)        (value<ignore>, offset, length, salt) -> (addr)
+
 EXTCODECOPY(4,0)    (addr, destOffset, offset, length)
 */
 
-void simpleRewrite(CompilerContext *c, string function, int _in, int _out) {
+void complexRewrite(CompilerContext *c, string function, int _in, int _out,
+	string code, vector<string> const& _localVariables) {
+
 	auto methodId = FixedHash<4>(dev::keccak256(function)).hex();
 	cerr << "rewriting " << function << endl;
 
@@ -102,18 +104,26 @@ void simpleRewrite(CompilerContext *c, string function, int _in, int _out) {
 
 	auto asm_code = Whiskers(R"({
 		let methodId := 0x<methodId>
-
 		let callBytes := mload(0x40)
-
-		// hmm, never free memory?
-		// unclear if this is needed
-		mstore(0x40, add(callBytes, <max_size>))
 
 		// replace the first 4 bytes with the right methodID
 		mstore8(callBytes, shr(24, methodId))
 		mstore8(add(callBytes, 1), shr(16, methodId))
 		mstore8(add(callBytes, 2), shr(8, methodId))
 		mstore8(add(callBytes, 3), methodId)
+	)")("methodId", methodId).render();
+	c->appendInlineAssembly(asm_code+code, _localVariables);
+
+	for (int i = 0; i < _in-_out; i++) {
+		c->assemblyPtr()->append(Instruction::POP);
+	}
+}
+
+void simpleRewrite(CompilerContext *c, string function, int _in, int _out) {
+	auto asm_code = Whiskers(R"(
+		// hmm, never free memory?
+		// unclear if this is needed
+		mstore(0x40, add(callBytes, <max_size>))
 
 		// address to load
 		<input>
@@ -126,7 +136,7 @@ void simpleRewrite(CompilerContext *c, string function, int _in, int _out) {
 		}
 
 		<output>
-	})")("methodId", methodId);
+	})");
 	asm_code("in_size", to_string(_in*0x20+4));
 	asm_code("out_size", to_string(_out*0x20));
 	asm_code("max_size", to_string(max(_in*0x20+4, _out*0x20)));
@@ -149,13 +159,9 @@ void simpleRewrite(CompilerContext *c, string function, int _in, int _out) {
 	//cerr << asm_code.render() << endl;
 
 	if (_in == 2) {
-		c->appendInlineAssembly(asm_code.render(), {"x2", "x1"});
+		complexRewrite(c, function, _in, _out, asm_code.render(), {"x2", "x1"});
 	} else {
-		c->appendInlineAssembly(asm_code.render(), {"x1"});
-	}
-	
-	for (int i = 0; i < _in-_out; i++) {
-		c->assemblyPtr()->append(Instruction::POP);
+		complexRewrite(c, function, _in, _out, asm_code.render(), {"x1"});
 	}
 }
 
@@ -166,6 +172,18 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 
 	disable_rewrite = true;
 	//std::cerr << a << " append_callback" << _i << std::endl;
+
+	auto callYUL = R"(
+		mstore(add(callBytes, 4), addr)
+		calldatacopy(add(callBytes, 0x24), argsOffset, argsLength)
+
+		let success := call(gas(), caller(), 0, callBytes, add(0x24, argsLength), retOffset, retLength)
+
+		if eq(success, 0) {
+			revert(0, 0)
+		}
+		gas := mload(callBytes)
+	})";
 
 	//cerr << "Instruction operator<< " << _instruction << endl;
 	bool ret = false;
@@ -201,6 +219,18 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 				break;
 			case Instruction::ORIGIN:
 				simpleRewrite(c, "ovmORIGIN()", 0, 1);
+				break;
+			case Instruction::CALL:
+				complexRewrite(c, "ovmCALL()", 7, 1, callYUL,
+					{"retLength", "retOffset", "argsLength", "argsOffset", "value", "addr", "gas"});
+				break;
+			case Instruction::STATICCALL:
+				complexRewrite(c, "ovmSTATICCALL()", 6, 1, callYUL,
+					{"retLength", "retOffset", "argsLength", "argsOffset", "addr", "gas"});
+				break;
+			case Instruction::DELEGATECALL:
+				complexRewrite(c, "ovmDELEGATECALL()", 6, 1, callYUL,
+					{"retLength", "retOffset", "argsLength", "argsOffset", "addr", "gas"});
 				break;
 			default:
 				ret = false;
