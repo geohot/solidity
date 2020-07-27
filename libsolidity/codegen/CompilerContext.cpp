@@ -163,36 +163,40 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 	//cerr << "Instruction operator<< " << _instruction << endl;
 	bool ret = false;
 	if (_i.type() == Operation) {
-		
+		ret = true;  // will be set to false again if we don't change the instruction
 		switch (_i.instruction()) {
 			case Instruction::SSTORE:
 				simpleRewrite(c, "ovmSSTORE()", 2, 0);
-				ret = true;
 				break;
 			case Instruction::SLOAD:
 				simpleRewrite(c, "ovmSLOAD()", 1, 1);
-				ret = true;
+				break;
+			case Instruction::EXTCODESIZE:
+				simpleRewrite(c, "ovmEXTCODESIZE()", 1, 1);
+				break;
+			case Instruction::EXTCODEHASH:
+				simpleRewrite(c, "ovmEXTCODEHASH()", 1, 1);
 				break;
 			case Instruction::CALLER:
 				simpleRewrite(c, "ovmCALLER()", 0, 1);
-				ret = true;
 				break;
 			case Instruction::ADDRESS:
-				cerr << "rewriting ADDRESS" << endl;
+				simpleRewrite(c, "ovmADDRESS()", 0, 1);
 				break;
 			case Instruction::TIMESTAMP:
-				cerr << "rewriting TIMESTAMP" << endl;
+				simpleRewrite(c, "ovmTIMESTAMP()", 0, 1);
 				break;
 			case Instruction::CHAINID:
-				cerr << "rewriting CHAINID" << endl;
-				// junk on stack to overwrite
-				/*c->assemblyPtr()->append(Instruction::DUP1);
-				c->appendInlineAssembly(R"({
-						x1 := chainid()
-					})", {"x1"});
-				ret = true;*/
+				simpleRewrite(c, "ovmCHAINID()", 0, 1);
+				break;
+			case Instruction::GASLIMIT:
+				simpleRewrite(c, "ovmGASLIMIT()", 0, 1);
+				break;
+			case Instruction::ORIGIN:
+				simpleRewrite(c, "ovmORIGIN()", 0, 1);
 				break;
 			default:
+				ret = false;
 				break;
 		}
 	}
