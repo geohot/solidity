@@ -90,25 +90,11 @@ AssemblyItem const& Assembly::_append(AssemblyItem const& _i)
 
 AssemblyItem const& Assembly::append(AssemblyItem const& _i)
 {
-	//cerr << "Assembly::append HACK" << endl;
+	if (append_callback && append_callback(append_arg, _i)) {
+		// leave it alone, the callback handled it
+		return back();
+	}
 
-	// hook this for the bad opcodes and generate the replacement code
-	/*if (_i.type() == Operation) {
-		//printf("  THIS IS OPERATION\n")
-		switch (_i.instruction()) {
-			case Instruction::SLOAD:
-				cerr << "rewrite sload:  " << _i << endl;
-				break;
-			case Instruction::SSTORE:
-				cerr << "rewrite sstore: " << _i << endl;
-				break;
-			case Instruction::CHAINID:
-				cerr << "rewrite chainid: " << _i << endl;
-				break;
-			default:
-				break;
-		}
-	}*/
 	return _append(_i);
 }
 

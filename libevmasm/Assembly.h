@@ -152,6 +152,11 @@ public:
 	AssemblyItem const& back() const { return m_items.back(); }
 	std::string backString() const { return m_items.size() && m_items.back().type() == PushString ? m_strings.at((h256)m_items.back().data()) : std::string(); }
 
+	void set_append_callback(std::function<bool(void *, AssemblyItem const&)> f, void *a) {
+		append_callback = f;
+		append_arg = a;
+	}
+
 protected:
 	/// Does the same operations as @a optimise, but should only be applied to a sub and
 	/// returns the replaced tags. Also takes an argument containing the tags of this assembly
@@ -175,6 +180,10 @@ protected:
 	std::vector<std::shared_ptr<Assembly>> m_subs;
 	std::map<h256, std::string> m_strings;
 	std::map<h256, std::string> m_libraries; ///< Identifiers of libraries to be linked.
+
+	// add this in for callbacks
+	std::function<bool(void *, AssemblyItem const&)> append_callback;
+	void *append_arg;
 
 	mutable LinkerObject m_assembledObject;
 	mutable std::vector<size_t> m_tagPositionsInBytecode;

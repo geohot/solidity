@@ -59,6 +59,46 @@ using namespace dev::eth;
 using namespace dev;
 using namespace dev::solidity;
 
+bool disable_rewrite = false;
+bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
+	CompilerContext *c = (CompilerContext *)a;
+	if (disable_rewrite) return false;
+
+	disable_rewrite = true;
+	//std::cerr << a << " append_callback" << _i << std::endl;
+
+	//cerr << "Instruction operator<< " << _instruction << endl;
+	bool ret = false;
+	if (_i.type() == Operation) {
+		if (_i.instruction() == Instruction::SSTORE) {
+			cerr << "rewriting SSTORE" << endl;
+			c->appendInlineAssembly(R"({
+					sstore(x1, x2)
+				})", {"x2", "x1"});
+			c->assemblyPtr()->append(Instruction::POP);
+			c->assemblyPtr()->append(Instruction::POP);
+			ret = true;
+		} else if (_i.instruction() == Instruction::SLOAD) {
+			cerr << "rewriting SLOAD" << endl;
+			c->appendInlineAssembly(R"({
+					x1 := sload(x1)
+				})", {"x1"});
+			ret = true;
+		} else if (_i.instruction() == Instruction::CHAINID) {
+			cerr << "rewriting CHAINID" << endl;
+			// junk on stack to overwrite
+			c->assemblyPtr()->append(Instruction::DUP1);
+			c->appendInlineAssembly(R"({
+					x1 := chainid()
+				})", {"x1"});
+			ret = true;
+		}
+	}
+
+	disable_rewrite = false;
+	return ret;
+}
+
 void CompilerContext::addStateVariable(
 	VariableDeclaration const& _declaration,
 	u256 const& _storageOffset,
@@ -334,6 +374,8 @@ void CompilerContext::appendInlineAssembly(
 	OptimiserSettings const& _optimiserSettings
 )
 {
+	//cerr << "assembly " << _assembly << endl;
+
 	int startStackHeight = stackHeight();
 
 	set<yul::YulString> externallyUsedIdentifiers;
@@ -534,22 +576,8 @@ CompilerContext& CompilerContext::operator<<(eth::AssemblyItem const& _item) {
 }
 
 CompilerContext& CompilerContext::operator<<(dev::eth::Instruction _instruction) {
-	//cerr << "Instruction operator<< " << _instruction << endl;
-	if (_instruction == Instruction::SSTORE) {
-		cerr << "rewriting SSTORE" << endl;
-		appendInlineAssembly(R"({
-				sstore(x1, x2)
-			})", {"x2", "x1"});
-		m_asm->append(Instruction::POP);
-		m_asm->append(Instruction::POP);
-	} else if (_instruction == Instruction::SLOAD) {
-		cerr << "rewriting SLOAD" << endl;
-		appendInlineAssembly(R"({
-				x1 := sload(x1)
-			})", {"x1"});
-  } else {
-		m_asm->append(_instruction);
-	}
+	
+	m_asm->append(_instruction);
 	return *this;
 }
 
