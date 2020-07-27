@@ -115,6 +115,7 @@ void complexRewrite(CompilerContext *c, string function, int _in, int _out,
 	c->appendInlineAssembly(asm_code+code, _localVariables);
 
 	for (int i = 0; i < _in-_out; i++) {
+		//cerr << "POP" << endl;
 		c->assemblyPtr()->append(Instruction::POP);
 	}
 }
@@ -182,7 +183,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 		if eq(success, 0) { revert(0, 0) }
 
 		// TODO: is this right? we aren't passing through the return code
-		in_gas := success
+		retLength := success
 	})";
 
 	//cerr << "Instruction operator<< " << _instruction << endl;
@@ -240,7 +241,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 						let success := call(gas(), caller(), 0, callBytes, add(4, length), callBytes, 0x20)
 						if eq(success, 0) { revert(0, 0) }
 
-						value := mload(callBytes)
+						length := mload(callBytes)
 					})",
 					{"length", "offset", "value"});
 				break;
@@ -253,7 +254,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 						let success := call(gas(), caller(), 0, callBytes, add(0x24, length), callBytes, 0x20)
 						if eq(success, 0) { revert(0, 0) }
 
-						value := mload(callBytes)
+						salt := mload(callBytes)
 					})",
 					{"salt", "length", "offset", "value"});
 				break;
