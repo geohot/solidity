@@ -176,13 +176,13 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 	auto callYUL = R"(
 		mstore(add(callBytes, 4), addr)
 		calldatacopy(add(callBytes, 0x24), argsOffset, argsLength)
+		mstore(0x40, add(add(callBytes, 0x24), argsLength))
 
 		let success := call(gas(), caller(), 0, callBytes, add(0x24, argsLength), retOffset, retLength)
+		if eq(success, 0) { revert(0, 0) }
 
-		if eq(success, 0) {
-			revert(0, 0)
-		}
-		gas := mload(callBytes)
+		// TODO: is this right? we aren't passing through the return code
+		gas := success
 	})";
 
 	//cerr << "Instruction operator<< " << _instruction << endl;
@@ -231,6 +231,43 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 			case Instruction::DELEGATECALL:
 				complexRewrite(c, "ovmDELEGATECALL()", 6, 1, callYUL,
 					{"retLength", "retOffset", "argsLength", "argsOffset", "addr", "gas"});
+				break;
+			case Instruction::CREATE:
+				complexRewrite(c, "ovmCREATE()", 3, 1, R"(
+						calldatacopy(add(callBytes, 4), offset, length)
+						mstore(0x40, add(add(callBytes, 4), length))
+
+						let success := call(gas(), caller(), 0, callBytes, add(4, length), callBytes, 0x20)
+						if eq(success, 0) { revert(0, 0) }
+
+						value := mload(callBytes)
+					})",
+					{"length", "offset", "value"});
+				break;
+			case Instruction::CREATE2:
+				complexRewrite(c, "ovmCREATE2()", 4, 1, R"(
+						mstore(add(callBytes, 4), salt)
+						calldatacopy(add(callBytes, 0x24), offset, length)
+						mstore(0x40, add(add(callBytes, 0x24), length))
+
+						let success := call(gas(), caller(), 0, callBytes, add(0x24, argsLength), callBytes, 0x20)
+						if eq(success, 0) { revert(0, 0) }
+
+						value := mload(callBytes)
+					})",
+					{"salt", "length", "offset", "value"});
+				break;
+			case Instruction::EXTCODECOPY:
+				complexRewrite(c, "ovmEXTCODECOPY()", 4, 0, R"(
+						mstore(add(callBytes, 4), addr)
+						mstore(add(callBytes, 0x24), offset)
+						mstore(add(callBytes, 0x44), length)
+						mstore(0x40, add(callBytes, 0x64))
+
+						let success := call(gas(), caller(), 0, callBytes, 0x64, destOffset, length)
+						if eq(success, 0) { revert(0, 0) }
+					})",
+					{"length", "offset", "destOffset", "addr"});
 				break;
 			default:
 				ret = false;
