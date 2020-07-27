@@ -176,10 +176,15 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 
 	auto callYUL = R"(
 		mstore(add(callBytes, 4), addr)
-		calldatacopy(add(callBytes, 0x24), argsOffset, argsLength)
-		mstore(0x40, add(add(callBytes, 0x24), argsLength))
+		//calldatacopy(add(callBytes, 0x24), argsOffset, argsLength)
+		let ptr := 0
+		for { } lt(ptr, argsLength) { ptr := add(ptr, 0x20) } {
+			mstore(add(add(callBytes, 0x24), ptr), mload(add(argsOffset, ptr)))
+		}
+		let callLen := add(0x24, argsLength)
+		mstore(0x40, add(add(callBytes, 0x24), ptr))
 
-		let success := call(gas(), caller(), 0, callBytes, add(0x24, argsLength), retOffset, retLength)
+		let success := call(gas(), caller(), 0, callBytes, callLen, retOffset, retLength)
 		if eq(success, 0) { revert(0, 0) }
 
 		// TODO: is this right? we aren't passing through the return code
@@ -235,10 +240,16 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 				break;
 			case Instruction::CREATE:
 				complexRewrite(c, "ovmCREATE()", 3, 1, R"(
-						calldatacopy(add(callBytes, 4), offset, length)
-						mstore(0x40, add(add(callBytes, 4), length))
+						//calldatacopy(add(callBytes, 4), offset, length)
+						let ptr := 0
+						for { } lt(ptr, length) { ptr := add(ptr, 0x20) } {
+							mstore(add(add(callBytes, 4), ptr), mload(add(offset, ptr)))
+						}
 
-						let success := call(gas(), caller(), 0, callBytes, add(4, length), callBytes, 0x20)
+						let callLen := add(4, length)
+						mstore(0x40, add(add(callBytes, 4), ptr))
+
+						let success := call(gas(), caller(), 0, callBytes, callLen, callBytes, 0x20)
 						if eq(success, 0) { revert(0, 0) }
 
 						length := mload(callBytes)
@@ -248,10 +259,16 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 			case Instruction::CREATE2:
 				complexRewrite(c, "ovmCREATE2()", 4, 1, R"(
 						mstore(add(callBytes, 4), salt)
-						calldatacopy(add(callBytes, 0x24), offset, length)
-						mstore(0x40, add(add(callBytes, 0x24), length))
+						//calldatacopy(add(callBytes, 0x24), offset, length)
+						let ptr := 0
+						for { } lt(ptr, length) { ptr := add(ptr, 0x20) } {
+							mstore(add(add(callBytes, 0x24), ptr), mload(add(offset, ptr)))
+						}
 
-						let success := call(gas(), caller(), 0, callBytes, add(0x24, length), callBytes, 0x20)
+						let callLen := add(0x24, length)
+						mstore(0x40, add(add(callBytes, 0x24), ptr))
+
+						let success := call(gas(), caller(), 0, callBytes, callLen, callBytes, 0x20)
 						if eq(success, 0) { revert(0, 0) }
 
 						salt := mload(callBytes)
