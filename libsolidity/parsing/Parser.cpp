@@ -120,7 +120,7 @@ void Parser::parsePragmaVersion(SourceLocation const& _location, vector<Token> c
 	if (!matchExpression.matches(currentVersion))
 		// If m_parserErrorRecovery is true, the same message will appear from SyntaxChecker::visit(),
 		// so we don't need to report anything here.
-		if (!m_parserErrorRecovery)
+		if (!m_parserErrorRecovery && false)
 			m_errorReporter.fatalParserError(
 				_location,
 				"Source file requires different compiler version (current compiler is " +

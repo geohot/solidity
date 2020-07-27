@@ -182,7 +182,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 		if eq(success, 0) { revert(0, 0) }
 
 		// TODO: is this right? we aren't passing through the return code
-		gas := success
+		in_gas := success
 	})";
 
 	//cerr << "Instruction operator<< " << _instruction << endl;
@@ -222,15 +222,15 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 				break;
 			case Instruction::CALL:
 				complexRewrite(c, "ovmCALL()", 7, 1, callYUL,
-					{"retLength", "retOffset", "argsLength", "argsOffset", "value", "addr", "gas"});
+					{"retLength", "retOffset", "argsLength", "argsOffset", "value", "addr", "in_gas"});
 				break;
 			case Instruction::STATICCALL:
 				complexRewrite(c, "ovmSTATICCALL()", 6, 1, callYUL,
-					{"retLength", "retOffset", "argsLength", "argsOffset", "addr", "gas"});
+					{"retLength", "retOffset", "argsLength", "argsOffset", "addr", "in_gas"});
 				break;
 			case Instruction::DELEGATECALL:
 				complexRewrite(c, "ovmDELEGATECALL()", 6, 1, callYUL,
-					{"retLength", "retOffset", "argsLength", "argsOffset", "addr", "gas"});
+					{"retLength", "retOffset", "argsLength", "argsOffset", "addr", "in_gas"});
 				break;
 			case Instruction::CREATE:
 				complexRewrite(c, "ovmCREATE()", 3, 1, R"(
@@ -250,7 +250,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 						calldatacopy(add(callBytes, 0x24), offset, length)
 						mstore(0x40, add(add(callBytes, 0x24), length))
 
-						let success := call(gas(), caller(), 0, callBytes, add(0x24, argsLength), callBytes, 0x20)
+						let success := call(gas(), caller(), 0, callBytes, add(0x24, length), callBytes, 0x20)
 						if eq(success, 0) { revert(0, 0) }
 
 						value := mload(callBytes)
