@@ -123,10 +123,6 @@ void complexRewrite(CompilerContext *c, string function, int _in, int _out,
 
 void simpleRewrite(CompilerContext *c, string function, int _in, int _out) {
 	auto asm_code = Whiskers(R"(
-		// hmm, never free memory?
-		// unclear if this is needed
-		//mstore(0x40, add(callBytes, <max_size>))
-
 		// address to load
 		<input>
 
@@ -177,7 +173,6 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 
 	auto callYUL = R"(
 		mstore(add(callBytes, 4), addr)
-
 		for { let ptr := 0 } lt(ptr, argsLength) { ptr := add(ptr, 0x20) } {
 			mstore(add(add(callBytes, 0x24), ptr), mload(add(argsOffset, ptr)))
 		}
@@ -252,7 +247,6 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 			case Instruction::CREATE2:
 				complexRewrite(c, "ovmCREATE2()", 4, 1, R"(
 						mstore(add(callBytes, 4), salt)
-
 						for { let ptr := 0 } lt(ptr, length) { ptr := add(ptr, 0x20) } {
 							mstore(add(add(callBytes, 0x24), ptr), mload(add(offset, ptr)))
 						}
@@ -269,7 +263,6 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 						mstore(add(callBytes, 4), addr)
 						mstore(add(callBytes, 0x24), offset)
 						mstore(add(callBytes, 0x44), length)
-						mstore(0x40, add(callBytes, 0x64))
 
 						let success := call(gas(), caller(), 0, callBytes, 0x64, destOffset, length)
 						if eq(success, 0) { revert(0, 0) }
