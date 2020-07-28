@@ -105,8 +105,8 @@ void complexRewrite(CompilerContext *c, string function, int _in, int _out,
 	auto asm_code = Whiskers(R"({
 		let methodId := 0x<methodId>
 		let callBytes := mload(0x40)
-		// hack
-		callBytes := add(callBytes, 0x1000)
+		// hack to fix test-ovm-full-node, it failed with normal memory management
+		callBytes := add(callBytes, 0x10000)
 
 		// replace the first 4 bytes with the right methodID
 		mstore8(callBytes, shr(24, methodId))
