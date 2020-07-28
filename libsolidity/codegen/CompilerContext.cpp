@@ -105,11 +105,14 @@ void complexRewrite(CompilerContext *c, string function, int _in, int _out,
 
 	auto asm_code = Whiskers(R"({
 		let methodId := 0x<methodId>
-		let callBytes := mload(0x40)
 		let em := caller()
 
 		// hack to fix test-ovm-full-node, it failed with normal memory management
-		callBytes := add(callBytes, 0x1000)
+		//let callBytes := mload(0x40)
+		//callBytes := add(callBytes, 0x1000)
+
+		// needed to fix synthetix
+		let callBytes := 0x80000
 
 		// replace the first 4 bytes with the right methodID
 		mstore(callBytes, shl(224, methodId))
@@ -204,10 +207,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 				simpleRewrite(c, "ovmCALLER()", 0, 1);
 				break;
 			case Instruction::ADDRESS:
-				// TODO: this is breaking the synthetix deployments
-				// is executionContext.ovmActiveContract set at deployment?
-				//simpleRewrite(c, "ovmADDRESS()", 0, 1);
-				ret = false;
+				simpleRewrite(c, "ovmADDRESS()", 0, 1);
 				break;
 			case Instruction::TIMESTAMP:
 				simpleRewrite(c, "ovmTIMESTAMP()", 0, 1);
