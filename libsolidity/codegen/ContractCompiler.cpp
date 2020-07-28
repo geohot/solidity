@@ -591,7 +591,6 @@ bool ContractCompiler::visit(FunctionDefinition const& _function)
 
 bool ContractCompiler::visit(InlineAssembly const& _inlineAssembly)
 {
-	cerr << "visit InlineAssembly" << endl;
 	unsigned startStackHeight = m_context.stackHeight();
 	yul::ExternalIdentifierAccess identifierAccess;
 	identifierAccess.resolve = [&](yul::Identifier const& _identifier, yul::IdentifierContext, bool)

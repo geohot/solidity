@@ -139,7 +139,6 @@ void simpleRewrite(CompilerContext *c, string function, int _in, int _out) {
 	})");
 	asm_code("in_size", to_string(_in*0x20+4));
 	asm_code("out_size", to_string(_out*0x20));
-	asm_code("max_size", to_string(max(_in*0x20+4, _out*0x20)));
 
 	asm_code("output", (_out > 0) ? "x1 := mload(callBytes)" : "");
 
@@ -155,8 +154,6 @@ void simpleRewrite(CompilerContext *c, string function, int _in, int _out) {
 			asm_code("input", "mstore(add(callBytes, 4), x1)\nmstore(add(callBytes, 0x24), x2)");
 			break;
 	}
-
-	//cerr << asm_code.render() << endl;
 
 	if (_in == 2) {
 		complexRewrite(c, function, _in, _out, asm_code.render(), {"x2", "x1"});
@@ -207,7 +204,10 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 				simpleRewrite(c, "ovmCALLER()", 0, 1);
 				break;
 			case Instruction::ADDRESS:
-				simpleRewrite(c, "ovmADDRESS()", 0, 1);
+				// TODO: this is breaking the synthetix deployments
+				// is executionContext.ovmActiveContract set at deployment?
+				//simpleRewrite(c, "ovmADDRESS()", 0, 1);
+				ret = false;
 				break;
 			case Instruction::TIMESTAMP:
 				simpleRewrite(c, "ovmTIMESTAMP()", 0, 1);
