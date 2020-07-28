@@ -96,7 +96,7 @@ void complexRewrite(CompilerContext *c, string function, int _in, int _out,
 	string code, vector<string> const& _localVariables) {
 
 	auto methodId = FixedHash<4>(dev::keccak256(function)).hex();
-	cerr << "rewriting " << function << endl;
+	//cerr << "rewriting " << function << endl;
 
 	for (int i = 0; i < _out-_in; i++) {
 		// put junk on the stack
