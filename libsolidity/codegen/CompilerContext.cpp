@@ -105,15 +105,14 @@ void complexRewrite(CompilerContext *c, string function, int _in, int _out,
 	auto asm_code = Whiskers(R"({
 		let methodId := 0x<methodId>
 		let callBytes := mload(0x40)
+
 		// hack to fix test-ovm-full-node, it failed with normal memory management
 		callBytes := add(callBytes, 0x1000)
 
 		// replace the first 4 bytes with the right methodID
-		mstore8(callBytes, shr(24, methodId))
-		mstore8(add(callBytes, 1), shr(16, methodId))
-		mstore8(add(callBytes, 2), shr(8, methodId))
-		mstore8(add(callBytes, 3), methodId)
+		mstore(callBytes, shl(224, methodId))
 	)")("methodId", methodId).render();
+
 	c->appendInlineAssembly(asm_code+code, _localVariables);
 
 	for (int i = 0; i < _in-_out; i++) {
@@ -178,23 +177,12 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 
 	auto callYUL = R"(
 		mstore(add(callBytes, 4), addr)
-		//calldatacopy(add(callBytes, 0x24), argsOffset, argsLength)
-		let ptr := 0
-		for { } lt(ptr, argsLength) { ptr := add(ptr, 0x20) } {
+
+		for { let ptr := 0 } lt(ptr, argsLength) { ptr := add(ptr, 0x20) } {
 			mstore(add(add(callBytes, 0x24), ptr), mload(add(argsOffset, ptr)))
 		}
-		let callLen := add(0x24, argsLength)
-		//mstore(0x40, add(add(callBytes, 0x24), ptr))
 
-		// TODO: why use returndatacopy?
-		//let success := call(in_gas, caller(), 0, callBytes, callLen, retOffset, retLength)
-		let success := call(gas(), caller(), 0, callBytes, callLen, retOffset, retLength)
-
-		//mstore(retOffset, 0xaabbccddaabbccddaabbccddaabbccdd)
-		//let success := 1
-
-		//let success := call(gas(), caller(), 0, callBytes, callLen, 0, 0)
-		//returndatacopy(retOffset, 0, returndatasize())
+		let success := call(gas(), caller(), 0, callBytes, add(0x24, argsLength), retOffset, retLength)
 		if eq(success, 0) { revert(0, 0) }
 
 		// TODO: is this right? we aren't passing through the return code
@@ -250,16 +238,11 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 				break;
 			case Instruction::CREATE:
 				complexRewrite(c, "ovmCREATE()", 3, 1, R"(
-						//calldatacopy(add(callBytes, 4), offset, length)
-						let ptr := 0
-						for { } lt(ptr, length) { ptr := add(ptr, 0x20) } {
+						for { let ptr := 0 } lt(ptr, length) { ptr := add(ptr, 0x20) } {
 							mstore(add(add(callBytes, 4), ptr), mload(add(offset, ptr)))
 						}
 
-						let callLen := add(4, length)
-						//mstore(0x40, add(add(callBytes, 4), ptr))
-
-						let success := call(gas(), caller(), 0, callBytes, callLen, callBytes, 0x20)
+						let success := call(gas(), caller(), 0, callBytes, add(4, length), callBytes, 0x20)
 						if eq(success, 0) { revert(0, 0) }
 
 						length := mload(callBytes)
@@ -269,16 +252,12 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 			case Instruction::CREATE2:
 				complexRewrite(c, "ovmCREATE2()", 4, 1, R"(
 						mstore(add(callBytes, 4), salt)
-						//calldatacopy(add(callBytes, 0x24), offset, length)
-						let ptr := 0
-						for { } lt(ptr, length) { ptr := add(ptr, 0x20) } {
+
+						for { let ptr := 0 } lt(ptr, length) { ptr := add(ptr, 0x20) } {
 							mstore(add(add(callBytes, 0x24), ptr), mload(add(offset, ptr)))
 						}
 
-						let callLen := add(0x24, length)
-						//mstore(0x40, add(add(callBytes, 0x24), ptr))
-
-						let success := call(gas(), caller(), 0, callBytes, callLen, callBytes, 0x20)
+						let success := call(gas(), caller(), 0, callBytes, add(0x24, length), callBytes, 0x20)
 						if eq(success, 0) { revert(0, 0) }
 
 						salt := mload(callBytes)
