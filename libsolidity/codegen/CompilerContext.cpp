@@ -99,12 +99,14 @@ void complexRewrite(CompilerContext *c, string function, int _in, int _out,
 	cerr << "rewriting " << function << endl;
 
 	for (int i = 0; i < _out-_in; i++) {
-		c->assemblyPtr()->append(Instruction::DUP1);
+		// put junk on the stack
+		c->assemblyPtr()->append(Instruction::GAS);
 	}
 
 	auto asm_code = Whiskers(R"({
 		let methodId := 0x<methodId>
 		let callBytes := mload(0x40)
+		let em := caller()
 
 		// hack to fix test-ovm-full-node, it failed with normal memory management
 		callBytes := add(callBytes, 0x1000)
@@ -127,7 +129,7 @@ void simpleRewrite(CompilerContext *c, string function, int _in, int _out) {
 		<input>
 
 		// overwrite call params
-		let success := call(gas(), caller(), 0, callBytes, <in_size>, callBytes, <out_size>)
+		let success := call(gas(), em, 0, callBytes, <in_size>, callBytes, <out_size>)
 
 		if eq(success, 0) {
 				revert(0, 0)
@@ -177,7 +179,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 			mstore(add(add(callBytes, 0x24), ptr), mload(add(argsOffset, ptr)))
 		}
 
-		let success := call(gas(), caller(), 0, callBytes, add(0x24, argsLength), retOffset, retLength)
+		let success := call(gas(), em, 0, callBytes, add(0x24, argsLength), retOffset, retLength)
 		if eq(success, 0) { revert(0, 0) }
 
 		// TODO: is this right? we aren't passing through the return code
@@ -237,7 +239,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 							mstore(add(add(callBytes, 4), ptr), mload(add(offset, ptr)))
 						}
 
-						let success := call(gas(), caller(), 0, callBytes, add(4, length), callBytes, 0x20)
+						let success := call(gas(), em, 0, callBytes, add(4, length), callBytes, 0x20)
 						if eq(success, 0) { revert(0, 0) }
 
 						length := mload(callBytes)
@@ -251,7 +253,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 							mstore(add(add(callBytes, 0x24), ptr), mload(add(offset, ptr)))
 						}
 
-						let success := call(gas(), caller(), 0, callBytes, add(0x24, length), callBytes, 0x20)
+						let success := call(gas(), em, 0, callBytes, add(0x24, length), callBytes, 0x20)
 						if eq(success, 0) { revert(0, 0) }
 
 						salt := mload(callBytes)
@@ -264,7 +266,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 						mstore(add(callBytes, 0x24), offset)
 						mstore(add(callBytes, 0x44), length)
 
-						let success := call(gas(), caller(), 0, callBytes, 0x64, destOffset, length)
+						let success := call(gas(), em, 0, callBytes, 0x64, destOffset, length)
 						if eq(success, 0) { revert(0, 0) }
 					})",
 					{"length", "offset", "destOffset", "addr"});
