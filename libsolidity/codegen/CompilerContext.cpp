@@ -105,6 +105,8 @@ void complexRewrite(CompilerContext *c, string function, int _in, int _out,
 	auto asm_code = Whiskers(R"({
 		let methodId := 0x<methodId>
 		let callBytes := mload(0x40)
+		// hack
+		callBytes := add(callBytes, 0x1000)
 
 		// replace the first 4 bytes with the right methodID
 		mstore8(callBytes, shr(24, methodId))
@@ -124,7 +126,7 @@ void simpleRewrite(CompilerContext *c, string function, int _in, int _out) {
 	auto asm_code = Whiskers(R"(
 		// hmm, never free memory?
 		// unclear if this is needed
-		mstore(0x40, add(callBytes, <max_size>))
+		//mstore(0x40, add(callBytes, <max_size>))
 
 		// address to load
 		<input>
@@ -182,9 +184,17 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 			mstore(add(add(callBytes, 0x24), ptr), mload(add(argsOffset, ptr)))
 		}
 		let callLen := add(0x24, argsLength)
-		mstore(0x40, add(add(callBytes, 0x24), ptr))
+		//mstore(0x40, add(add(callBytes, 0x24), ptr))
 
+		// TODO: why use returndatacopy?
+		//let success := call(in_gas, caller(), 0, callBytes, callLen, retOffset, retLength)
 		let success := call(gas(), caller(), 0, callBytes, callLen, retOffset, retLength)
+
+		//mstore(retOffset, 0xaabbccddaabbccddaabbccddaabbccdd)
+		//let success := 1
+
+		//let success := call(gas(), caller(), 0, callBytes, callLen, 0, 0)
+		//returndatacopy(retOffset, 0, returndatasize())
 		if eq(success, 0) { revert(0, 0) }
 
 		// TODO: is this right? we aren't passing through the return code
@@ -247,7 +257,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 						}
 
 						let callLen := add(4, length)
-						mstore(0x40, add(add(callBytes, 4), ptr))
+						//mstore(0x40, add(add(callBytes, 4), ptr))
 
 						let success := call(gas(), caller(), 0, callBytes, callLen, callBytes, 0x20)
 						if eq(success, 0) { revert(0, 0) }
@@ -266,7 +276,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 						}
 
 						let callLen := add(0x24, length)
-						mstore(0x40, add(add(callBytes, 0x24), ptr))
+						//mstore(0x40, add(add(callBytes, 0x24), ptr))
 
 						let success := call(gas(), caller(), 0, callBytes, callLen, callBytes, 0x20)
 						if eq(success, 0) { revert(0, 0) }
