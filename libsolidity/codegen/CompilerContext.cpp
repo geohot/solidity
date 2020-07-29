@@ -78,12 +78,12 @@ void complexRewrite(CompilerContext *c, string function, int _in, int _out,
 		mstore(callBytes, shl(224, methodId))
 	)")("methodId", methodId).render();
 
-	cerr << "rewriting " << function << endl;
+	//cerr << "rewriting " << function << endl;
 
-	// this is the same for every call to "function"
 	for (int i = 0; i < _out-_in; i++) {
 		c->assemblyPtr()->append(Instruction::GAS);
 	}
+
 	if (opt) {
 		c->callLowLevelFunction(function, 0, 0,
 			[asm_code, code, _localVariables](CompilerContext& _context) {
@@ -132,10 +132,9 @@ void simpleRewrite(CompilerContext *c, string function, int _in, int _out, bool 
 
 bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 	CompilerContext *c = (CompilerContext *)a;
-	if (disable_rewrite) return false;
 
+	if (disable_rewrite) return false;
 	disable_rewrite = true;
-	//std::cerr << a << " append_callback" << _i << std::endl;
 
 	auto callYUL = R"(
 		mstore(add(callBytes, 4), addr)
