@@ -79,6 +79,7 @@ void CompilerContext::complexRewrite(string function, int _in, int _out,
 	//cerr << "rewriting " << function << endl;
 
 	for (int i = 0; i < _out-_in; i++) {
+		// add padding to the stack, the value doesn't matter
 		assemblyPtr()->append(Instruction::GAS);
 	}
 
