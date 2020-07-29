@@ -151,9 +151,8 @@ public:
 	AssemblyItem const& back() const { return m_items.back(); }
 	std::string backString() const { return m_items.size() && m_items.back().type() == PushString ? m_strings.at((h256)m_items.back().data()) : std::string(); }
 
-	void set_append_callback(std::function<bool(void *, AssemblyItem const&)> f, void *a) {
+	void set_append_callback(std::function<bool(AssemblyItem const&)> f) {
 		append_callback = f;
-		append_arg = a;
 	}
 
 protected:
@@ -181,8 +180,7 @@ protected:
 	std::map<h256, std::string> m_libraries; ///< Identifiers of libraries to be linked.
 
 	// add this in for callbacks
-	std::function<bool(void *, AssemblyItem const&)> append_callback;
-	void *append_arg;
+	std::function<bool(AssemblyItem const&)> append_callback;
 
 	mutable LinkerObject m_assembledObject;
 	mutable std::vector<size_t> m_tagPositionsInBytecode;

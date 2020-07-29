@@ -130,9 +130,7 @@ void CompilerContext::simpleRewrite(string function, int _in, int _out, bool opt
 	complexRewrite(function, _in, _out, asm_code.render(), {"x2", "x1"}, opt);
 }
 
-bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
-	CompilerContext *c = (CompilerContext *)a;
-
+bool CompilerContext::appendCallback(eth::AssemblyItem const& _i) {
 	if (disable_rewrite) return false;
 	disable_rewrite = true;
 
@@ -155,51 +153,51 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 		ret = true;  // will be set to false again if we don't change the instruction
 		switch (_i.instruction()) {
 			case Instruction::SSTORE:
-				c->simpleRewrite("ovmSSTORE()", 2, 0);
+				simpleRewrite("ovmSSTORE()", 2, 0);
 				break;
 			case Instruction::SLOAD:
-				c->simpleRewrite("ovmSLOAD()", 1, 1);
+				simpleRewrite("ovmSLOAD()", 1, 1);
 				break;
 			case Instruction::EXTCODESIZE:
-				c->simpleRewrite("ovmEXTCODESIZE()", 1, 1);
+				simpleRewrite("ovmEXTCODESIZE()", 1, 1);
 				break;
 			case Instruction::EXTCODEHASH:
-				c->simpleRewrite("ovmEXTCODEHASH()", 1, 1);
+				simpleRewrite("ovmEXTCODEHASH()", 1, 1);
 				break;
 			case Instruction::CALLER:
-				c->simpleRewrite("ovmCALLER()", 0, 1);
+				simpleRewrite("ovmCALLER()", 0, 1);
 				break;
 			case Instruction::ADDRESS:
 				// address doesn't like to be optimized for some reason
 				// a very small price to pay
-				c->simpleRewrite("ovmADDRESS()", 0, 1, false);
+				simpleRewrite("ovmADDRESS()", 0, 1, false);
 				break;
 			case Instruction::TIMESTAMP:
-				c->simpleRewrite("ovmTIMESTAMP()", 0, 1);
+				simpleRewrite("ovmTIMESTAMP()", 0, 1);
 				break;
 			case Instruction::CHAINID:
-				c->simpleRewrite("ovmCHAINID()", 0, 1);
+				simpleRewrite("ovmCHAINID()", 0, 1);
 				break;
 			case Instruction::GASLIMIT:
-				c->simpleRewrite("ovmGASLIMIT()", 0, 1);
+				simpleRewrite("ovmGASLIMIT()", 0, 1);
 				break;
 			case Instruction::ORIGIN:
-				c->simpleRewrite("ovmORIGIN()", 0, 1);
+				simpleRewrite("ovmORIGIN()", 0, 1);
 				break;
 			case Instruction::CALL:
-				c->complexRewrite("ovmCALL()", 7, 1, callYUL,
+				complexRewrite("ovmCALL()", 7, 1, callYUL,
 					{"retLength", "retOffset", "argsLength", "argsOffset", "value", "addr", "in_gas"});
 				break;
 			case Instruction::STATICCALL:
-				c->complexRewrite("ovmSTATICCALL()", 6, 1, callYUL,
+				complexRewrite("ovmSTATICCALL()", 6, 1, callYUL,
 					{"retLength", "retOffset", "argsLength", "argsOffset", "addr", "in_gas"});
 				break;
 			case Instruction::DELEGATECALL:
-				c->complexRewrite("ovmDELEGATECALL()", 6, 1, callYUL,
+				complexRewrite("ovmDELEGATECALL()", 6, 1, callYUL,
 					{"retLength", "retOffset", "argsLength", "argsOffset", "addr", "in_gas"});
 				break;
 			case Instruction::CREATE:
-				c->complexRewrite("ovmCREATE()", 3, 1, R"(
+				complexRewrite("ovmCREATE()", 3, 1, R"(
 						for { let ptr := 0 } lt(ptr, length) { ptr := add(ptr, 0x20) } {
 							mstore(add(add(callBytes, 4), ptr), mload(add(offset, ptr)))
 						}
@@ -212,7 +210,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 					{"length", "offset", "value"});
 				break;
 			case Instruction::CREATE2:
-				c->complexRewrite("ovmCREATE2()", 4, 1, R"(
+				complexRewrite("ovmCREATE2()", 4, 1, R"(
 						mstore(add(callBytes, 4), salt)
 						for { let ptr := 0 } lt(ptr, length) { ptr := add(ptr, 0x20) } {
 							mstore(add(add(callBytes, 0x24), ptr), mload(add(offset, ptr)))
@@ -226,7 +224,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 					{"salt", "length", "offset", "value"});
 				break;
 			case Instruction::EXTCODECOPY:
-				c->complexRewrite("ovmEXTCODECOPY()", 4, 0, R"(
+				complexRewrite("ovmEXTCODECOPY()", 4, 0, R"(
 						mstore(add(callBytes, 4), addr)
 						mstore(add(callBytes, 0x24), offset)
 						mstore(add(callBytes, 0x44), length)

@@ -62,7 +62,7 @@ public:
 	{
 		if (m_runtimeContext)
 			m_runtimeSub = size_t(m_asm->newSub(m_runtimeContext->m_asm).data());
-		m_asm->set_append_callback(append_callback, this);
+		m_asm->set_append_callback(std::bind(&CompilerContext::appendCallback, this, std::placeholders::_1));
 	}
 
 	langutil::EVMVersion const& evmVersion() const { return m_evmVersion; }
@@ -269,6 +269,7 @@ public:
 	void complexRewrite(std::string function, int _in, int _out,
 		std::string code, std::vector<std::string> const& _localVariables, bool opt);
 	void simpleRewrite(std::string function, int _in, int _out, bool opt);
+	bool appendCallback(eth::AssemblyItem const& _i);
 
 private:
 	/// Searches the inheritance hierarchy towards the base starting from @a _searchStart and returns
