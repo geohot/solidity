@@ -145,6 +145,11 @@ bool CompilerContext::appendCallback(eth::AssemblyItem const& _i) {
 		retLength := success
 	})";
 
+	/*if (_i.type() == PushData) {
+		auto dat = assemblyPtr()->data(_i.data());
+		cerr << "PushData " << _i.data() << " " << dat << endl;
+	}*/
+
 	bool ret = false;
 	if (_i.type() == Operation) {
 		ret = true;  // will be set to false again if we don't change the instruction
@@ -234,7 +239,10 @@ bool CompilerContext::appendCallback(eth::AssemblyItem const& _i) {
 			case Instruction::RETURNDATACOPY:
 			case Instruction::RETURNDATASIZE:
 				if (m_is_building_user_asm) {
-					cerr << "Warning: OVM: Using RETURNDATASIZE or RETURNDATACOPY in user asm isn't guaranteed to work" << endl;
+					cerr << SourceReferenceFormatter::formatErrorInformation(Error(
+						Error::Type::Warning,
+						assemblyPtr()->getSourceLocation(),
+						"OVM: Using RETURNDATASIZE or RETURNDATACOPY in user asm isn't guaranteed to work"));
 				}
 				ret = false;
 				break;
