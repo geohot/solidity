@@ -145,7 +145,6 @@ bool CompilerContext::appendCallback(eth::AssemblyItem const& _i) {
 		retLength := success
 	})";
 
-	//cerr << "Instruction operator<< " << _instruction << endl;
 	bool ret = false;
 	if (_i.type() == Operation) {
 		ret = true;  // will be set to false again if we don't change the instruction
@@ -231,6 +230,13 @@ bool CompilerContext::appendCallback(eth::AssemblyItem const& _i) {
 						if eq(success, 0) { revert(0, 0) }
 					})",
 					{"length", "offset", "destOffset", "addr"});
+				break;
+			case Instruction::RETURNDATACOPY:
+			case Instruction::RETURNDATASIZE:
+				if (m_is_building_user_asm) {
+					cerr << "Warning: OVM: Using RETURNDATASIZE or RETURNDATACOPY in user asm isn't guaranteed to work" << endl;
+				}
+				ret = false;
 				break;
 			default:
 				ret = false;

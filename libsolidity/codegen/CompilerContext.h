@@ -268,7 +268,8 @@ public:
 		std::string code, std::vector<std::string> const& _localVariables, bool opt);
 	void simpleRewrite(std::string function, int _in, int _out, bool opt);
 	bool appendCallback(eth::AssemblyItem const& _i);
-	bool m_disable_rewrite;
+	bool m_disable_rewrite = false;
+	bool m_is_building_user_asm = false;
 
 private:
 	/// Searches the inheritance hierarchy towards the base starting from @a _searchStart and returns
