@@ -506,6 +506,11 @@ Parser::FunctionHeaderParserResult Parser::parseFunctionHeader(bool _forceEmptyN
 	}
 	else
 		result.returnParameters = createEmptyParameterList();
+
+	// Add a warning if constructor has arguments
+	if (result.isConstructor && result.parameters->parameters().size() > 0) {
+		parserWarning("OVM: Taking arguments in constructor may result in unsafe code.");
+	}
 	return result;
 }
 
