@@ -152,7 +152,7 @@ public:
 	std::string backString() const { return m_items.size() && m_items.back().type() == PushString ? m_strings.at((h256)m_items.back().data()) : std::string(); }
 
 	void setAppendCallback(std::function<bool(AssemblyItem const&)> f) { append_callback = f; }
-	std::function<bool(AssemblyItem const&)> append_callback;
+	std::function<bool(AssemblyItem const&)> append_callback = NULL;
 
 protected:
 	/// Does the same operations as @a optimise, but should only be applied to a sub and
@@ -177,7 +177,6 @@ protected:
 	std::vector<std::shared_ptr<Assembly>> m_subs;
 	std::map<h256, std::string> m_strings;
 	std::map<h256, std::string> m_libraries; ///< Identifiers of libraries to be linked.
-
 
 	mutable LinkerObject m_assembledObject;
 	mutable std::vector<size_t> m_tagPositionsInBytecode;
