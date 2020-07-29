@@ -750,7 +750,6 @@ bool ContractCompiler::visit(InlineAssembly const& _inlineAssembly)
 		}
 	};
 	solAssert(_inlineAssembly.annotation().analysisInfo, "");
-
 	yul::CodeGenerator::assemble(
 		_inlineAssembly.operations(),
 		*_inlineAssembly.annotation().analysisInfo,
