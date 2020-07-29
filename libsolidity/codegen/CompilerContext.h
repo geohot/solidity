@@ -265,6 +265,11 @@ public:
 			ScopeGuard([&]{ _compilerContext.popVisitedNodes(); }) { _compilerContext.pushVisitedNodes(&_node); }
 	};
 
+	/// Functions for rewriting opcodes to OVM
+	void complexRewrite(std::string function, int _in, int _out,
+		std::string code, std::vector<std::string> const& _localVariables, bool opt);
+	void simpleRewrite(std::string function, int _in, int _out, bool opt);
+
 private:
 	/// Searches the inheritance hierarchy towards the base starting from @a _searchStart and returns
 	/// the first function definition that is overwritten by _function.

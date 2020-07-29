@@ -63,7 +63,7 @@ using namespace dev::solidity;
 
 bool disable_rewrite = false;
 
-void complexRewrite(CompilerContext *c, string function, int _in, int _out,
+void CompilerContext::complexRewrite(string function, int _in, int _out,
 	string code, vector<string> const& _localVariables, bool opt=true) {
 
 	auto methodId = FixedHash<4>(dev::keccak256(function)).hex();
@@ -81,11 +81,11 @@ void complexRewrite(CompilerContext *c, string function, int _in, int _out,
 	//cerr << "rewriting " << function << endl;
 
 	for (int i = 0; i < _out-_in; i++) {
-		c->assemblyPtr()->append(Instruction::GAS);
+		assemblyPtr()->append(Instruction::GAS);
 	}
 
 	if (opt) {
-		c->callLowLevelFunction(function, 0, 0,
+		callLowLevelFunction(function, 0, 0,
 			[asm_code, code, _localVariables](CompilerContext& _context) {
 				vector<string> lv = _localVariables;
 				lv.push_back("ret");
@@ -95,15 +95,15 @@ void complexRewrite(CompilerContext *c, string function, int _in, int _out,
 			}
 		);
 	} else {
-		c->appendInlineAssembly(asm_code+code, _localVariables);
+		appendInlineAssembly(asm_code+code, _localVariables);
 	}
 
 	for (int i = 0; i < _in-_out; i++) {
-		c->assemblyPtr()->append(Instruction::POP);
+		assemblyPtr()->append(Instruction::POP);
 	}
 }
 
-void simpleRewrite(CompilerContext *c, string function, int _in, int _out, bool opt=true) {
+void CompilerContext::simpleRewrite(string function, int _in, int _out, bool opt=true) {
 	assert(_in <= 2);
 	assert(_out <= 1);
 
@@ -127,7 +127,7 @@ void simpleRewrite(CompilerContext *c, string function, int _in, int _out, bool 
 	asm_code("input2", (_in >= 2) ? "mstore(add(callBytes, 0x24), x2)" : "");
 	asm_code("output", (_out > 0) ? "x1 := mload(callBytes)" : "");
 
-	complexRewrite(c, function, _in, _out, asm_code.render(), {"x2", "x1"}, opt);
+	complexRewrite(function, _in, _out, asm_code.render(), {"x2", "x1"}, opt);
 }
 
 bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
@@ -155,51 +155,51 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 		ret = true;  // will be set to false again if we don't change the instruction
 		switch (_i.instruction()) {
 			case Instruction::SSTORE:
-				simpleRewrite(c, "ovmSSTORE()", 2, 0);
+				c->simpleRewrite("ovmSSTORE()", 2, 0);
 				break;
 			case Instruction::SLOAD:
-				simpleRewrite(c, "ovmSLOAD()", 1, 1);
+				c->simpleRewrite("ovmSLOAD()", 1, 1);
 				break;
 			case Instruction::EXTCODESIZE:
-				simpleRewrite(c, "ovmEXTCODESIZE()", 1, 1);
+				c->simpleRewrite("ovmEXTCODESIZE()", 1, 1);
 				break;
 			case Instruction::EXTCODEHASH:
-				simpleRewrite(c, "ovmEXTCODEHASH()", 1, 1);
+				c->simpleRewrite("ovmEXTCODEHASH()", 1, 1);
 				break;
 			case Instruction::CALLER:
-				simpleRewrite(c, "ovmCALLER()", 0, 1);
+				c->simpleRewrite("ovmCALLER()", 0, 1);
 				break;
 			case Instruction::ADDRESS:
 				// address doesn't like to be optimized for some reason
 				// a very small price to pay
-				simpleRewrite(c, "ovmADDRESS()", 0, 1, false);
+				c->simpleRewrite("ovmADDRESS()", 0, 1, false);
 				break;
 			case Instruction::TIMESTAMP:
-				simpleRewrite(c, "ovmTIMESTAMP()", 0, 1);
+				c->simpleRewrite("ovmTIMESTAMP()", 0, 1);
 				break;
 			case Instruction::CHAINID:
-				simpleRewrite(c, "ovmCHAINID()", 0, 1);
+				c->simpleRewrite("ovmCHAINID()", 0, 1);
 				break;
 			case Instruction::GASLIMIT:
-				simpleRewrite(c, "ovmGASLIMIT()", 0, 1);
+				c->simpleRewrite("ovmGASLIMIT()", 0, 1);
 				break;
 			case Instruction::ORIGIN:
-				simpleRewrite(c, "ovmORIGIN()", 0, 1);
+				c->simpleRewrite("ovmORIGIN()", 0, 1);
 				break;
 			case Instruction::CALL:
-				complexRewrite(c, "ovmCALL()", 7, 1, callYUL,
+				c->complexRewrite("ovmCALL()", 7, 1, callYUL,
 					{"retLength", "retOffset", "argsLength", "argsOffset", "value", "addr", "in_gas"});
 				break;
 			case Instruction::STATICCALL:
-				complexRewrite(c, "ovmSTATICCALL()", 6, 1, callYUL,
+				c->complexRewrite("ovmSTATICCALL()", 6, 1, callYUL,
 					{"retLength", "retOffset", "argsLength", "argsOffset", "addr", "in_gas"});
 				break;
 			case Instruction::DELEGATECALL:
-				complexRewrite(c, "ovmDELEGATECALL()", 6, 1, callYUL,
+				c->complexRewrite("ovmDELEGATECALL()", 6, 1, callYUL,
 					{"retLength", "retOffset", "argsLength", "argsOffset", "addr", "in_gas"});
 				break;
 			case Instruction::CREATE:
-				complexRewrite(c, "ovmCREATE()", 3, 1, R"(
+				c->complexRewrite("ovmCREATE()", 3, 1, R"(
 						for { let ptr := 0 } lt(ptr, length) { ptr := add(ptr, 0x20) } {
 							mstore(add(add(callBytes, 4), ptr), mload(add(offset, ptr)))
 						}
@@ -212,7 +212,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 					{"length", "offset", "value"});
 				break;
 			case Instruction::CREATE2:
-				complexRewrite(c, "ovmCREATE2()", 4, 1, R"(
+				c->complexRewrite("ovmCREATE2()", 4, 1, R"(
 						mstore(add(callBytes, 4), salt)
 						for { let ptr := 0 } lt(ptr, length) { ptr := add(ptr, 0x20) } {
 							mstore(add(add(callBytes, 0x24), ptr), mload(add(offset, ptr)))
@@ -226,7 +226,7 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 					{"salt", "length", "offset", "value"});
 				break;
 			case Instruction::EXTCODECOPY:
-				complexRewrite(c, "ovmEXTCODECOPY()", 4, 0, R"(
+				c->complexRewrite("ovmEXTCODECOPY()", 4, 0, R"(
 						mstore(add(callBytes, 4), addr)
 						mstore(add(callBytes, 0x24), offset)
 						mstore(add(callBytes, 0x44), length)
