@@ -40,6 +40,11 @@
 #include <queue>
 #include <utility>
 
+namespace langutil
+{
+class ErrorReporter;
+}
+
 namespace dev {
 namespace solidity {
 
@@ -52,11 +57,12 @@ class Compiler;
 class CompilerContext
 {
 public:
-	explicit CompilerContext(langutil::EVMVersion _evmVersion, CompilerContext* _runtimeContext = nullptr):
+	explicit CompilerContext(langutil::EVMVersion _evmVersion, langutil::ErrorReporter& _errorReporter, CompilerContext* _runtimeContext = nullptr):
 		m_asm(std::make_shared<eth::Assembly>()),
 		m_evmVersion(_evmVersion),
 		m_runtimeContext(_runtimeContext),
-		m_abiFunctions(m_evmVersion)
+		m_abiFunctions(m_evmVersion),
+		m_errorReporter(_errorReporter)
 	{
 		if (m_runtimeContext)
 			m_runtimeSub = size_t(m_asm->newSub(m_runtimeContext->m_asm).data());
@@ -345,6 +351,8 @@ private:
 	ABIFunctions m_abiFunctions;
 	/// The queue of low-level functions to generate.
 	std::queue<std::tuple<std::string, unsigned, unsigned, std::function<void(CompilerContext&)>>> m_lowLevelFunctionGenerationQueue;
+
+	langutil::ErrorReporter& m_errorReporter;
 };
 
 }

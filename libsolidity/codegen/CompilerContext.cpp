@@ -148,10 +148,9 @@ bool CompilerContext::appendCallback(eth::AssemblyItem const& _i) {
 	if (_i.type() == PushData) {
 		auto dat = assemblyPtr()->data(_i.data());
 		if (std::find(dat.begin(), dat.end(), 0x5b) != dat.end()) {
-			cerr << SourceReferenceFormatter::formatErrorInformation(Error(
-					Error::Type::Warning,
-					assemblyPtr()->getSourceLocation(),
-					"OVM: JUMPDEST found in constant"));
+			m_errorReporter.warning(
+				assemblyPtr()->getSourceLocation(),
+				"OVM: JUMPDEST found in constant");
 		}
 	}
 
@@ -244,10 +243,9 @@ bool CompilerContext::appendCallback(eth::AssemblyItem const& _i) {
 			case Instruction::RETURNDATACOPY:
 			case Instruction::RETURNDATASIZE:
 				if (m_is_building_user_asm) {
-					cerr << SourceReferenceFormatter::formatErrorInformation(Error(
-						Error::Type::Warning,
+					m_errorReporter.warning(
 						assemblyPtr()->getSourceLocation(),
-						"OVM: Using RETURNDATASIZE or RETURNDATACOPY in user asm isn't guaranteed to work"));
+						"OVM: Using RETURNDATASIZE or RETURNDATACOPY in user asm isn't guaranteed to work");
 				}
 				ret = false;
 				break;

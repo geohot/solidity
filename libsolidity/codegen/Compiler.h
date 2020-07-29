@@ -35,10 +35,10 @@ namespace solidity {
 class Compiler
 {
 public:
-	explicit Compiler(langutil::EVMVersion _evmVersion, OptimiserSettings _optimiserSettings):
+	explicit Compiler(langutil::EVMVersion _evmVersion, OptimiserSettings _optimiserSettings, langutil::ErrorReporter& _errorReporter):
 		m_optimiserSettings(std::move(_optimiserSettings)),
-		m_runtimeContext(_evmVersion),
-		m_context(_evmVersion, &m_runtimeContext)
+		m_runtimeContext(_evmVersion, _errorReporter),
+		m_context(_evmVersion, _errorReporter, &m_runtimeContext)
 	{ }
 
 	/// Compiles a contract.
