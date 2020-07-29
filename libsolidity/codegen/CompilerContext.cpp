@@ -92,16 +92,12 @@ CREATE2(4,1)        (value<ignore>, offset, length, salt) -> (addr)
 EXTCODECOPY(4,0)    (addr, destOffset, offset, length)
 */
 
+bool disable_rewrite = false;
+
 void complexRewrite(CompilerContext *c, string function, int _in, int _out,
-	string code, vector<string> const& _localVariables) {
+	string code, vector<string> const& _localVariables, bool opt=true) {
 
 	auto methodId = FixedHash<4>(dev::keccak256(function)).hex();
-	//cerr << "rewriting " << function << endl;
-
-	for (int i = 0; i < _out-_in; i++) {
-		// put junk on the stack
-		c->assemblyPtr()->append(Instruction::GAS);
-	}
 
 	auto asm_code = Whiskers(R"({
 		let methodId := 0x<methodId>
@@ -113,15 +109,32 @@ void complexRewrite(CompilerContext *c, string function, int _in, int _out,
 		mstore(callBytes, shl(224, methodId))
 	)")("methodId", methodId).render();
 
-	c->appendInlineAssembly(asm_code+code, _localVariables);
+	cerr << "rewriting " << function << endl;
+
+	// this is the same for every call to "function"
+	for (int i = 0; i < _out-_in; i++) {
+		c->assemblyPtr()->append(Instruction::GAS);
+	}
+	if (opt) {
+		c->callLowLevelFunction(function, 0, 0,
+			[asm_code, code, _localVariables](CompilerContext& _context) {
+				vector<string> lv = _localVariables;
+				lv.push_back("ret");
+				disable_rewrite = true;
+				_context.appendInlineAssembly(asm_code+code, lv);
+				disable_rewrite = false;
+			}
+		);
+	} else {
+		c->appendInlineAssembly(asm_code+code, _localVariables);
+	}
 
 	for (int i = 0; i < _in-_out; i++) {
-		//cerr << "POP" << endl;
 		c->assemblyPtr()->append(Instruction::POP);
 	}
 }
 
-void simpleRewrite(CompilerContext *c, string function, int _in, int _out) {
+void simpleRewrite(CompilerContext *c, string function, int _in, int _out, bool opt=true) {
 	auto asm_code = Whiskers(R"(
 		// address to load
 		<input>
@@ -154,13 +167,12 @@ void simpleRewrite(CompilerContext *c, string function, int _in, int _out) {
 	}
 
 	if (_in == 2) {
-		complexRewrite(c, function, _in, _out, asm_code.render(), {"x2", "x1"});
+		complexRewrite(c, function, _in, _out, asm_code.render(), {"x2", "x1"}, opt);
 	} else {
-		complexRewrite(c, function, _in, _out, asm_code.render(), {"x1"});
+		complexRewrite(c, function, _in, _out, asm_code.render(), {"x1"}, opt);
 	}
 }
 
-bool disable_rewrite = false;
 bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 	CompilerContext *c = (CompilerContext *)a;
 	if (disable_rewrite) return false;
@@ -202,7 +214,9 @@ bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {
 				simpleRewrite(c, "ovmCALLER()", 0, 1);
 				break;
 			case Instruction::ADDRESS:
-				simpleRewrite(c, "ovmADDRESS()", 0, 1);
+				// address doesn't like to be optimized for some reason
+				// a very small price to pay
+				simpleRewrite(c, "ovmADDRESS()", 0, 1, false);
 				break;
 			case Instruction::TIMESTAMP:
 				simpleRewrite(c, "ovmTIMESTAMP()", 0, 1);
