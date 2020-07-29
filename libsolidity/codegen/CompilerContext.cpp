@@ -146,17 +146,12 @@ bool CompilerContext::appendCallback(eth::AssemblyItem const& _i) {
 	})";
 
 	if (_i.type() == PushData) {
-		list<vector<unsigned char> > forbidden_patterns = {
-			{0x60,0x80,0x60,0x40},
-			{0xff,0xff,0x60,0x40}};
 		auto dat = assemblyPtr()->data(_i.data());
-		for (auto needle : forbidden_patterns) {
-			if (std::search(dat.begin(), dat.end(), needle.begin(), needle.end()) != dat.end()) {
-				cerr << SourceReferenceFormatter::formatErrorInformation(Error(
-						Error::Type::Warning,
-						assemblyPtr()->getSourceLocation(),
-						"OVM: Forbidden pattern found in constant"));
-			}
+		if (std::find(dat.begin(), dat.end(), 0x5b) != dat.end()) {
+			cerr << SourceReferenceFormatter::formatErrorInformation(Error(
+					Error::Type::Warning,
+					assemblyPtr()->getSourceLocation(),
+					"OVM: JUMPDEST found in constant"));
 		}
 	}
 
