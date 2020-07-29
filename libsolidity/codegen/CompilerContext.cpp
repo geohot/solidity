@@ -104,9 +104,12 @@ void complexRewrite(CompilerContext *c, string function, int _in, int _out,
 }
 
 void simpleRewrite(CompilerContext *c, string function, int _in, int _out, bool opt=true) {
+	assert(_in <= 2);
+	assert(_out <= 1);
+
 	auto asm_code = Whiskers(R"(
-		// address to load
-		<input>
+		<input1>
+		<input2>
 
 		// overwrite call params
 		let success := call(gas(), caller(), 0, callBytes, <in_size>, callBytes, <out_size>)
@@ -120,26 +123,11 @@ void simpleRewrite(CompilerContext *c, string function, int _in, int _out, bool 
 	asm_code("in_size", to_string(_in*0x20+4));
 	asm_code("out_size", to_string(_out*0x20));
 
+	asm_code("input1", (_in >= 1) ? "mstore(add(callBytes, 4), x1)" : "");
+	asm_code("input2", (_in >= 2) ? "mstore(add(callBytes, 0x24), x2)" : "");
 	asm_code("output", (_out > 0) ? "x1 := mload(callBytes)" : "");
 
-	switch(_in) {
-		default:
-		case 0:
-			asm_code("input", "");
-			break;
-		case 1:
-			asm_code("input", "mstore(add(callBytes, 4), x1)");
-			break;
-		case 2:
-			asm_code("input", "mstore(add(callBytes, 4), x1)\nmstore(add(callBytes, 0x24), x2)");
-			break;
-	}
-
-	if (_in == 2) {
-		complexRewrite(c, function, _in, _out, asm_code.render(), {"x2", "x1"}, opt);
-	} else {
-		complexRewrite(c, function, _in, _out, asm_code.render(), {"x1"}, opt);
-	}
+	complexRewrite(c, function, _in, _out, asm_code.render(), {"x2", "x1"}, opt);
 }
 
 bool dev::solidity::append_callback(void *a, eth::AssemblyItem const& _i) {

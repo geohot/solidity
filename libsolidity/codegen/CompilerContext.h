@@ -64,7 +64,7 @@ public:
 			m_runtimeSub = size_t(m_asm->newSub(m_runtimeContext->m_asm).data());
 		m_asm->set_append_callback(append_callback, this);
 	}
-	
+
 	langutil::EVMVersion const& evmVersion() const { return m_evmVersion; }
 
 	/// Update currently enabled set of experimental features.
