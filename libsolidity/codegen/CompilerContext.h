@@ -265,8 +265,8 @@ public:
 
 	/// Functions for rewriting opcodes to OVM
 	void complexRewrite(std::string function, int _in, int _out,
-		std::string code, std::vector<std::string> const& _localVariables, bool opt);
-	void simpleRewrite(std::string function, int _in, int _out, bool opt);
+		std::string code, std::vector<std::string> const& _localVariables, bool optimize);
+	void simpleRewrite(std::string function, int _in, int _out, bool optimize);
 	bool appendCallback(eth::AssemblyItem const& _i);
 	bool m_disable_rewrite = false;
 	bool m_is_building_user_asm = false;

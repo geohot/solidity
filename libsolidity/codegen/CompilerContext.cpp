@@ -62,7 +62,7 @@ using namespace dev;
 using namespace dev::solidity;
 
 void CompilerContext::complexRewrite(string function, int _in, int _out,
-	string code, vector<string> const& _localVariables, bool opt=true) {
+	string code, vector<string> const& _localVariables, bool optimize=true) {
 
 	auto methodId = FixedHash<4>(dev::keccak256(function)).hex();
 
@@ -83,7 +83,7 @@ void CompilerContext::complexRewrite(string function, int _in, int _out,
 		assemblyPtr()->append(Instruction::GAS);
 	}
 
-	if (opt) {
+	if (optimize) {
 		callLowLevelFunction(function, 0, 0,
 			[asm_code, code, _localVariables](CompilerContext& _context) {
 				vector<string> lv = _localVariables;
@@ -102,7 +102,7 @@ void CompilerContext::complexRewrite(string function, int _in, int _out,
 	}
 }
 
-void CompilerContext::simpleRewrite(string function, int _in, int _out, bool opt=true) {
+void CompilerContext::simpleRewrite(string function, int _in, int _out, bool optimize=true) {
 	assert(_in <= 2);
 	assert(_out <= 1);
 
@@ -126,7 +126,7 @@ void CompilerContext::simpleRewrite(string function, int _in, int _out, bool opt
 	asm_code("input2", (_in >= 2) ? "mstore(add(callBytes, 0x24), x2)" : "");
 	asm_code("output", (_out > 0) ? "x1 := mload(callBytes)" : "");
 
-	complexRewrite(function, _in, _out, asm_code.render(), {"x2", "x1"}, opt);
+	complexRewrite(function, _in, _out, asm_code.render(), {"x2", "x1"}, optimize);
 }
 
 bool CompilerContext::appendCallback(eth::AssemblyItem const& _i) {
