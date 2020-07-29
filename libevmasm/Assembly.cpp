@@ -78,15 +78,6 @@ void Assembly::append(Assembly const& _a, int _deposit)
 	while (_deposit++ < _a.m_deposit)
 		append(Instruction::POP);
 }
-AssemblyItem const& Assembly::_append(AssemblyItem const& _i)
-{
-	assertThrow(m_deposit >= 0, AssemblyException, "Stack underflow.");
-	m_deposit += _i.deposit();
-	m_items.emplace_back(_i);
-	if (m_items.back().location().isEmpty() && !m_currentSourceLocation.isEmpty())
-		m_items.back().setLocation(m_currentSourceLocation);
-	return back();
-}
 
 AssemblyItem const& Assembly::append(AssemblyItem const& _i)
 {
@@ -95,7 +86,12 @@ AssemblyItem const& Assembly::append(AssemblyItem const& _i)
 		return back();
 	}
 
-	return _append(_i);
+	assertThrow(m_deposit >= 0, AssemblyException, "Stack underflow.");
+	m_deposit += _i.deposit();
+	m_items.emplace_back(_i);
+	if (m_items.back().location().isEmpty() && !m_currentSourceLocation.isEmpty())
+		m_items.back().setLocation(m_currentSourceLocation);
+	return back();
 }
 
 void Assembly::injectStart(AssemblyItem const& _i)

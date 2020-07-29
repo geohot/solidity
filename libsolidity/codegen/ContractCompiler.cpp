@@ -588,7 +588,6 @@ bool ContractCompiler::visit(FunctionDefinition const& _function)
 	return false;
 }
 
-
 bool ContractCompiler::visit(InlineAssembly const& _inlineAssembly)
 {
 	unsigned startStackHeight = m_context.stackHeight();
@@ -752,7 +751,6 @@ bool ContractCompiler::visit(InlineAssembly const& _inlineAssembly)
 	};
 	solAssert(_inlineAssembly.annotation().analysisInfo, "");
 
-	// can we wrap the m_context.assemblyPtr() to put it back through?
 	yul::CodeGenerator::assemble(
 		_inlineAssembly.operations(),
 		*_inlineAssembly.annotation().analysisInfo,

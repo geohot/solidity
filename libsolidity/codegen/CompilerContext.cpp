@@ -61,37 +61,6 @@ using namespace dev::eth;
 using namespace dev;
 using namespace dev::solidity;
 
-/*
-Opcodes that require replacement:
-0,1 = simple:
-CALLER
-ADDRESS
-TIMESTAMP
-CHAINID
-GASLIMIT
-ORIGIN
-
-1,1 = simple:
-SLOAD
-EXTCODESIZE
-EXTCODEHASH
-
-2,0 = simple:
-SSTORE
-
-annoying functions:
-see https://ethervm.io
-
-CALL(7,1)           (gas<ignore>, addr, value<ignore>, argsOffset, argsLength, retOffset, retLength) -> (success)
-STATICCALL(6,1)     (gas<ignore>, addr, argsOffset, argsLength, retOffset, retLength) -> (success)
-DELEGATECALL(6,1)   (gas<ignore>, addr, argsOffset, argsLength, retOffset, retLength) -> (success)
-
-CREATE(3,1)         (value<ignore>, offset, length) -> (addr)
-CREATE2(4,1)        (value<ignore>, offset, length, salt) -> (addr)
-
-EXTCODECOPY(4,0)    (addr, destOffset, offset, length)
-*/
-
 bool disable_rewrite = false;
 
 void complexRewrite(CompilerContext *c, string function, int _in, int _out,
@@ -565,8 +534,6 @@ void CompilerContext::appendInlineAssembly(
 	OptimiserSettings const& _optimiserSettings
 )
 {
-	//cerr << "assembly " << _assembly << endl;
-
 	int startStackHeight = stackHeight();
 
 	set<yul::YulString> externallyUsedIdentifiers;
@@ -758,18 +725,6 @@ eth::AssemblyItem CompilerContext::FunctionCompilationQueue::entryLabel(
 	else
 		return res->second.tag();
 
-}
-
-CompilerContext& CompilerContext::operator<<(eth::AssemblyItem const& _item) {
-	//cerr << "AssemblyItem operator<< " << _item << endl;
-	m_asm->append(_item);
-	return *this;
-}
-
-CompilerContext& CompilerContext::operator<<(dev::eth::Instruction _instruction) {
-	
-	m_asm->append(_instruction);
-	return *this;
 }
 
 eth::AssemblyItem CompilerContext::FunctionCompilationQueue::entryLabelIfExists(Declaration const& _declaration) const
