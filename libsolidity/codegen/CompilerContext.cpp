@@ -61,8 +61,6 @@ using namespace dev::eth;
 using namespace dev;
 using namespace dev::solidity;
 
-bool disable_rewrite = false;
-
 void CompilerContext::complexRewrite(string function, int _in, int _out,
 	string code, vector<string> const& _localVariables, bool opt=true) {
 
@@ -89,9 +87,9 @@ void CompilerContext::complexRewrite(string function, int _in, int _out,
 			[asm_code, code, _localVariables](CompilerContext& _context) {
 				vector<string> lv = _localVariables;
 				lv.push_back("ret");
-				disable_rewrite = true;
+				_context.m_disable_rewrite = true;
 				_context.appendInlineAssembly(asm_code+code, lv);
-				disable_rewrite = false;
+				_context.m_disable_rewrite = false;
 			}
 		);
 	} else {
@@ -131,8 +129,8 @@ void CompilerContext::simpleRewrite(string function, int _in, int _out, bool opt
 }
 
 bool CompilerContext::appendCallback(eth::AssemblyItem const& _i) {
-	if (disable_rewrite) return false;
-	disable_rewrite = true;
+	if (m_disable_rewrite) return false;
+	m_disable_rewrite = true;
 
 	auto callYUL = R"(
 		mstore(add(callBytes, 4), addr)
@@ -240,7 +238,7 @@ bool CompilerContext::appendCallback(eth::AssemblyItem const& _i) {
 		}
 	}
 
-	disable_rewrite = false;
+	m_disable_rewrite = false;
 	return ret;
 }
 
