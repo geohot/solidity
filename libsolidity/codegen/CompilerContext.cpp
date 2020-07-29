@@ -142,7 +142,6 @@ bool CompilerContext::appendCallback(eth::AssemblyItem const& _i) {
 		let success := call(gas(), caller(), 0, callBytes, add(0x24, argsLength), retOffset, retLength)
 		if eq(success, 0) { revert(0, 0) }
 
-		// TODO: is this right? we aren't passing through the return code
 		retLength := success
 	})";
 
