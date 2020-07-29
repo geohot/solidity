@@ -145,10 +145,20 @@ bool CompilerContext::appendCallback(eth::AssemblyItem const& _i) {
 		retLength := success
 	})";
 
-	/*if (_i.type() == PushData) {
+	if (_i.type() == PushData) {
+		list<vector<unsigned char> > forbidden_patterns = {
+			{0x60,0x80,0x60,0x40},
+			{0xff,0xff,0x60,0x40}};
 		auto dat = assemblyPtr()->data(_i.data());
-		cerr << "PushData " << _i.data() << " " << dat << endl;
-	}*/
+		for (auto needle : forbidden_patterns) {
+			if (std::search(dat.begin(), dat.end(), needle.begin(), needle.end()) != dat.end()) {
+				cerr << SourceReferenceFormatter::formatErrorInformation(Error(
+						Error::Type::Warning,
+						assemblyPtr()->getSourceLocation(),
+						"OVM: Forbidden pattern found in constant"));
+			}
+		}
+	}
 
 	bool ret = false;
 	if (_i.type() == Operation) {
