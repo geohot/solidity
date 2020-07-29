@@ -34,10 +34,13 @@ using namespace std;
 
 char const* dev::solidity::VersionNumber = ETH_PROJECT_VERSION;
 
-string const dev::solidity::VersionString =
+/*string const dev::solidity::VersionString =
 	string(dev::solidity::VersionNumber) +
 	(string(SOL_VERSION_PRERELEASE).empty() ? "" : "-" + string(SOL_VERSION_PRERELEASE)) +
-	(string(SOL_VERSION_BUILDINFO).empty() ? "" : "+" + string(SOL_VERSION_BUILDINFO));
+	(string(SOL_VERSION_BUILDINFO).empty() ? "" : "+" + string(SOL_VERSION_BUILDINFO));*/
+
+// Make the version string just the version number
+string const dev::solidity::VersionString = string(dev::solidity::VersionNumber);
 
 string const dev::solidity::VersionStringStrict =
 	string(dev::solidity::VersionNumber) +

@@ -118,7 +118,7 @@ bool SyntaxChecker::visit(PragmaDirective const& _pragma)
 		SemVerMatchExpressionParser parser(tokens, literals);
 		auto matchExpression = parser.parse();
 		static SemVerVersion const currentVersion{string(VersionString)};
-		if (!matchExpression.matches(currentVersion) && false)
+		if (!matchExpression.matches(currentVersion))
 			m_errorReporter.syntaxError(
 				_pragma.location(),
 				"Source file requires different compiler version (current compiler is " +
