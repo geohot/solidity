@@ -81,6 +81,9 @@ void Assembly::append(Assembly const& _a, int _deposit)
 
 AssemblyItem const& Assembly::append(AssemblyItem const& _i)
 {
+	// if the callback returns true, we don't append the instruction
+	if (append_callback && append_callback(_i)) { return back(); }
+
 	assertThrow(m_deposit >= 0, AssemblyException, "Stack underflow.");
 	m_deposit += _i.deposit();
 	m_items.emplace_back(_i);
@@ -231,8 +234,9 @@ void Assembly::assemblyStream(ostream& _out, string const& _prefix, StringMap co
 		}
 	}
 
-	if (m_auxiliaryData.size() > 0)
-		_out << endl << _prefix << "auxdata: 0x" << toHex(m_auxiliaryData) << endl;
+	// Commenting this out removes the aux data from compiled contracts
+	/*if (m_auxiliaryData.size() > 0)
+		_out << endl << _prefix << "auxdata: 0x" << toHex(m_auxiliaryData) << endl;*/
 }
 
 string Assembly::assemblyString(StringMap const& _sourceCodes) const

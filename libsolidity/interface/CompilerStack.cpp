@@ -987,7 +987,7 @@ void CompilerStack::compileContract(
 
 	Contract& compiledContract = m_contracts.at(_contract.fullyQualifiedName());
 
-	shared_ptr<Compiler> compiler = make_shared<Compiler>(m_evmVersion, m_optimiserSettings);
+	shared_ptr<Compiler> compiler = make_shared<Compiler>(m_evmVersion, m_optimiserSettings, m_errorReporter);
 	compiledContract.compiler = compiler;
 
 	bytes cborEncodedMetadata = createCBORMetadata(

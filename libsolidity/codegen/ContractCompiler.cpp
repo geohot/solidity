@@ -750,6 +750,7 @@ bool ContractCompiler::visit(InlineAssembly const& _inlineAssembly)
 		}
 	};
 	solAssert(_inlineAssembly.annotation().analysisInfo, "");
+	m_context.m_is_building_user_asm = true;
 	yul::CodeGenerator::assemble(
 		_inlineAssembly.operations(),
 		*_inlineAssembly.annotation().analysisInfo,
@@ -759,6 +760,7 @@ bool ContractCompiler::visit(InlineAssembly const& _inlineAssembly)
 		false,
 		m_optimiserSettings.optimizeStackAllocation
 	);
+	m_context.m_is_building_user_asm = false;
 	m_context.setStackOffset(startStackHeight);
 	return false;
 }

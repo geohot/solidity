@@ -37,6 +37,8 @@
 #include <libyul/Object.h>
 #include <libyul/YulString.h>
 
+#include <libdevcore/Whiskers.h>
+
 #include <liblangutil/ErrorReporter.h>
 #include <liblangutil/Scanner.h>
 #include <liblangutil/SourceReferenceFormatter.h>
@@ -58,6 +60,204 @@ using namespace langutil;
 using namespace dev::eth;
 using namespace dev;
 using namespace dev::solidity;
+
+void CompilerContext::complexRewrite(string function, int _in, int _out,
+	string code, vector<string> const& _localVariables, bool optimize=true) {
+
+	auto methodId = FixedHash<4>(dev::keccak256(function)).hex();
+
+	auto asm_code = Whiskers(R"({
+		let methodId := 0x<methodId>
+
+		// needed to fix synthetix
+		let callBytes := 0x80000
+
+		// replace the first 4 bytes with the right methodID
+		mstore(callBytes, shl(224, methodId))
+	)")("methodId", methodId).render();
+
+	//cerr << "rewriting " << function << endl;
+
+	for (int i = 0; i < _out-_in; i++) {
+		// add padding to the stack, the value doesn't matter
+		assemblyPtr()->append(Instruction::GAS);
+	}
+
+	if (optimize) {
+		callLowLevelFunction(function, 0, 0,
+			[asm_code, code, _localVariables](CompilerContext& _context) {
+				vector<string> lv = _localVariables;
+				lv.push_back("ret");
+				_context.m_disable_rewrite = true;
+				_context.appendInlineAssembly(asm_code+code, lv);
+				_context.m_disable_rewrite = false;
+			}
+		);
+	} else {
+		appendInlineAssembly(asm_code+code, _localVariables);
+	}
+
+	for (int i = 0; i < _in-_out; i++) {
+		assemblyPtr()->append(Instruction::POP);
+	}
+}
+
+void CompilerContext::simpleRewrite(string function, int _in, int _out, bool optimize=true) {
+	assert(_in <= 2);
+	assert(_out <= 1);
+
+	auto asm_code = Whiskers(R"(
+		<input1>
+		<input2>
+
+		// overwrite call params
+		let success := call(gas(), caller(), 0, callBytes, <in_size>, callBytes, <out_size>)
+
+		if eq(success, 0) {
+				revert(0, 0)
+		}
+
+		<output>
+	})");
+	asm_code("in_size", to_string(_in*0x20+4));
+	asm_code("out_size", to_string(_out*0x20));
+
+	asm_code("input1", (_in >= 1) ? "mstore(add(callBytes, 4), x1)" : "");
+	asm_code("input2", (_in >= 2) ? "mstore(add(callBytes, 0x24), x2)" : "");
+	asm_code("output", (_out > 0) ? "x1 := mload(callBytes)" : "");
+
+	complexRewrite(function, _in, _out, asm_code.render(), {"x2", "x1"}, optimize);
+}
+
+bool CompilerContext::appendCallback(eth::AssemblyItem const& _i) {
+	if (m_disable_rewrite) return false;
+	m_disable_rewrite = true;
+
+	auto callYUL = R"(
+		mstore(add(callBytes, 4), addr)
+		for { let ptr := 0 } lt(ptr, argsLength) { ptr := add(ptr, 0x20) } {
+			mstore(add(add(callBytes, 0x24), ptr), mload(add(argsOffset, ptr)))
+		}
+
+		let success := call(gas(), caller(), 0, callBytes, add(0x24, argsLength), retOffset, retLength)
+		if eq(success, 0) { revert(0, 0) }
+
+		retLength := success
+	})";
+
+	if (_i.type() == PushData) {
+		auto dat = assemblyPtr()->data(_i.data());
+		if (std::find(dat.begin(), dat.end(), 0x5b) != dat.end()) {
+			m_errorReporter.warning(
+				assemblyPtr()->getSourceLocation(),
+				"OVM: JUMPDEST found in constant");
+		}
+	}
+
+	bool ret = false;
+	if (_i.type() == Operation) {
+		ret = true;  // will be set to false again if we don't change the instruction
+		switch (_i.instruction()) {
+			case Instruction::SSTORE:
+				simpleRewrite("ovmSSTORE()", 2, 0);
+				break;
+			case Instruction::SLOAD:
+				simpleRewrite("ovmSLOAD()", 1, 1);
+				break;
+			case Instruction::EXTCODESIZE:
+				simpleRewrite("ovmEXTCODESIZE()", 1, 1);
+				break;
+			case Instruction::EXTCODEHASH:
+				simpleRewrite("ovmEXTCODEHASH()", 1, 1);
+				break;
+			case Instruction::CALLER:
+				simpleRewrite("ovmCALLER()", 0, 1);
+				break;
+			case Instruction::ADDRESS:
+				// address doesn't like to be optimized for some reason
+				// a very small price to pay
+				simpleRewrite("ovmADDRESS()", 0, 1, false);
+				break;
+			case Instruction::TIMESTAMP:
+				simpleRewrite("ovmTIMESTAMP()", 0, 1);
+				break;
+			case Instruction::CHAINID:
+				simpleRewrite("ovmCHAINID()", 0, 1);
+				break;
+			case Instruction::GASLIMIT:
+				simpleRewrite("ovmGASLIMIT()", 0, 1);
+				break;
+			case Instruction::ORIGIN:
+				simpleRewrite("ovmORIGIN()", 0, 1);
+				break;
+			case Instruction::CALL:
+				complexRewrite("ovmCALL()", 7, 1, callYUL,
+					{"retLength", "retOffset", "argsLength", "argsOffset", "value", "addr", "in_gas"});
+				break;
+			case Instruction::STATICCALL:
+				complexRewrite("ovmSTATICCALL()", 6, 1, callYUL,
+					{"retLength", "retOffset", "argsLength", "argsOffset", "addr", "in_gas"});
+				break;
+			case Instruction::DELEGATECALL:
+				complexRewrite("ovmDELEGATECALL()", 6, 1, callYUL,
+					{"retLength", "retOffset", "argsLength", "argsOffset", "addr", "in_gas"});
+				break;
+			case Instruction::CREATE:
+				complexRewrite("ovmCREATE()", 3, 1, R"(
+						for { let ptr := 0 } lt(ptr, length) { ptr := add(ptr, 0x20) } {
+							mstore(add(add(callBytes, 4), ptr), mload(add(offset, ptr)))
+						}
+
+						let success := call(gas(), caller(), 0, callBytes, add(4, length), callBytes, 0x20)
+						if eq(success, 0) { revert(0, 0) }
+
+						length := mload(callBytes)
+					})",
+					{"length", "offset", "value"});
+				break;
+			case Instruction::CREATE2:
+				complexRewrite("ovmCREATE2()", 4, 1, R"(
+						mstore(add(callBytes, 4), salt)
+						for { let ptr := 0 } lt(ptr, length) { ptr := add(ptr, 0x20) } {
+							mstore(add(add(callBytes, 0x24), ptr), mload(add(offset, ptr)))
+						}
+
+						let success := call(gas(), caller(), 0, callBytes, add(0x24, length), callBytes, 0x20)
+						if eq(success, 0) { revert(0, 0) }
+
+						salt := mload(callBytes)
+					})",
+					{"salt", "length", "offset", "value"});
+				break;
+			case Instruction::EXTCODECOPY:
+				complexRewrite("ovmEXTCODECOPY()", 4, 0, R"(
+						mstore(add(callBytes, 4), addr)
+						mstore(add(callBytes, 0x24), offset)
+						mstore(add(callBytes, 0x44), length)
+
+						let success := call(gas(), caller(), 0, callBytes, 0x64, destOffset, length)
+						if eq(success, 0) { revert(0, 0) }
+					})",
+					{"length", "offset", "destOffset", "addr"});
+				break;
+			case Instruction::RETURNDATACOPY:
+			case Instruction::RETURNDATASIZE:
+				if (m_is_building_user_asm) {
+					m_errorReporter.warning(
+						assemblyPtr()->getSourceLocation(),
+						"OVM: Using RETURNDATASIZE or RETURNDATACOPY in user asm isn't guaranteed to work");
+				}
+				ret = false;
+				break;
+			default:
+				ret = false;
+				break;
+		}
+	}
+
+	m_disable_rewrite = false;
+	return ret;
+}
 
 void CompilerContext::addStateVariable(
 	VariableDeclaration const& _declaration,

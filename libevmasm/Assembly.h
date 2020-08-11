@@ -95,6 +95,7 @@ public:
 
 	/// Changes the source location used for each appended item.
 	void setSourceLocation(langutil::SourceLocation const& _location) { m_currentSourceLocation = _location; }
+	langutil::SourceLocation const& getSourceLocation() { return m_currentSourceLocation; }
 
 	/// Assembles the assembly into bytecode. The assembly should not be modified after this call, since the assembled version is cached.
 	LinkerObject const& assemble() const;
@@ -150,6 +151,9 @@ public:
 
 	AssemblyItem const& back() const { return m_items.back(); }
 	std::string backString() const { return m_items.size() && m_items.back().type() == PushString ? m_strings.at((h256)m_items.back().data()) : std::string(); }
+
+	void setAppendCallback(std::function<bool(AssemblyItem const&)> f) { append_callback = f; }
+	std::function<bool(AssemblyItem const&)> append_callback = NULL;
 
 protected:
 	/// Does the same operations as @a optimise, but should only be applied to a sub and

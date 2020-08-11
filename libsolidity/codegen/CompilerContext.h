@@ -40,6 +40,11 @@
 #include <queue>
 #include <utility>
 
+namespace langutil
+{
+class ErrorReporter;
+}
+
 namespace dev {
 namespace solidity {
 
@@ -52,14 +57,16 @@ class Compiler;
 class CompilerContext
 {
 public:
-	explicit CompilerContext(langutil::EVMVersion _evmVersion, CompilerContext* _runtimeContext = nullptr):
+	explicit CompilerContext(langutil::EVMVersion _evmVersion, langutil::ErrorReporter& _errorReporter, CompilerContext* _runtimeContext = nullptr):
 		m_asm(std::make_shared<eth::Assembly>()),
 		m_evmVersion(_evmVersion),
 		m_runtimeContext(_runtimeContext),
-		m_abiFunctions(m_evmVersion)
+		m_abiFunctions(m_evmVersion),
+		m_errorReporter(_errorReporter)
 	{
 		if (m_runtimeContext)
 			m_runtimeSub = size_t(m_asm->newSub(m_runtimeContext->m_asm).data());
+		m_asm->setAppendCallback(std::bind(&CompilerContext::appendCallback, this, std::placeholders::_1));
 	}
 
 	langutil::EVMVersion const& evmVersion() const { return m_evmVersion; }
@@ -262,6 +269,14 @@ public:
 			ScopeGuard([&]{ _compilerContext.popVisitedNodes(); }) { _compilerContext.pushVisitedNodes(&_node); }
 	};
 
+	/// Functions for rewriting opcodes to OVM
+	void complexRewrite(std::string function, int _in, int _out,
+		std::string code, std::vector<std::string> const& _localVariables, bool optimize);
+	void simpleRewrite(std::string function, int _in, int _out, bool optimize);
+	bool appendCallback(eth::AssemblyItem const& _i);
+	bool m_disable_rewrite = false;
+	bool m_is_building_user_asm = false;
+
 private:
 	/// Searches the inheritance hierarchy towards the base starting from @a _searchStart and returns
 	/// the first function definition that is overwritten by _function.
@@ -336,6 +351,8 @@ private:
 	ABIFunctions m_abiFunctions;
 	/// The queue of low-level functions to generate.
 	std::queue<std::tuple<std::string, unsigned, unsigned, std::function<void(CompilerContext&)>>> m_lowLevelFunctionGenerationQueue;
+
+	langutil::ErrorReporter& m_errorReporter;
 };
 
 }
